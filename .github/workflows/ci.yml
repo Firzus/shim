@@ -21,7 +21,7 @@ jobs:
           version: 11.1.2
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: package.json
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # --no-fmt: lint + type-check only. Formatting is enforced by the
@@ -39,7 +39,7 @@ jobs:
           version: 11.1.2
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: package.json
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vp test run
