@@ -1,0 +1,130 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+ * Theme tokens — extracted from https://cursor.com/ (Cursor 3.3 marketing
+ * site + dashboard auth). Palette uses warm-neutrals + a single signature
+ * orange accent (#f54e00). Light tokens come from the site's explicit
+ * `data-theme="light"` variant; dark tokens are the default.
+ * --------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Cursor uses a very subtle 4px radius — barely-there roundedness. */
+  --radius: 0.25rem;
+  --radius-xs: calc(var(--radius) * 0.5);
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: calc(var(--radius) * 0.875);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
+
+  /* Literal font names — never `var(--font-sans)` self-reference inside
+   * @theme inline (Tailwind v4 resolves these at parse time). Cursor ships
+   * its own proprietary CursorGothic / berkeleyMono families; we fall back
+   * to system stacks so the same look degrades gracefully without licence. */
+  --font-sans:
+    'CursorGothic', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  --font-mono:
+    'berkeleyMono', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  --font-serif:
+    'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, ui-serif,
+    Georgia, Cambria, 'Times New Roman', Times, serif;
+}
+
+/* Light palette — Cursor's `data-theme="light"` variant. */
+:root {
+  --background: oklch(0.975 0.004 106.5); /* #f7f7f4 */
+  --foreground: oklch(0.263 0.013 100.5); /* #26251e */
+  --card: oklch(0.958 0.005 95.1); /* #f2f1ed */
+  --card-foreground: oklch(0.263 0.013 100.5);
+  --popover: oklch(0.958 0.005 95.1);
+  --popover-foreground: oklch(0.263 0.013 100.5);
+  --primary: oklch(0.652 0.214 38); /* #f54e00 — Cursor orange */
+  --primary-foreground: oklch(0.975 0.004 106.5);
+  --secondary: oklch(0.936 0.007 97.4); /* card-hover light */
+  --secondary-foreground: oklch(0.263 0.013 100.5);
+  --muted: oklch(0.958 0.005 95.1);
+  --muted-foreground: oklch(0.263 0.013 100.5 / 0.6); /* 60% opacity (matches text-sec) */
+  --accent: oklch(0.936 0.007 97.4);
+  --accent-foreground: oklch(0.263 0.013 100.5);
+  --destructive: oklch(0.566 0.197 12.3); /* #cf2d56 */
+  --destructive-foreground: oklch(0.975 0.004 106.5);
+  --success: oklch(0.565 0.11 164.5); /* #1f8a65 */
+  --success-foreground: oklch(0.975 0.004 106.5);
+  --border: oklch(0.263 0.013 100.5 / 0.1);
+  --input: oklch(0.263 0.013 100.5 / 0.1);
+  --ring: oklch(0.652 0.214 38 / 0.5);
+}
+
+/* Dark palette — Cursor's default. */
+.dark {
+  --background: oklch(0.182 0.014 94); /* #14120b */
+  --foreground: oklch(0.944 0.001 17.2); /* #edecec */
+  --card: oklch(0.214 0.012 91.8); /* #1b1913 */
+  --card-foreground: oklch(0.944 0.001 17.2);
+  --popover: oklch(0.214 0.012 91.8);
+  --popover-foreground: oklch(0.944 0.001 17.2);
+  --primary: oklch(0.652 0.214 38); /* #f54e00 — same accent in dark */
+  --primary-foreground: oklch(0.944 0.001 17.2);
+  --secondary: oklch(0.235 0.012 91.7); /* #201e18 */
+  --secondary-foreground: oklch(0.944 0.001 17.2);
+  --muted: oklch(0.214 0.012 91.8);
+  --muted-foreground: oklch(0.944 0.001 17.2 / 0.6);
+  --accent: oklch(0.235 0.012 91.7);
+  --accent-foreground: oklch(0.944 0.001 17.2);
+  --destructive: oklch(0.566 0.197 12.3);
+  --destructive-foreground: oklch(0.944 0.001 17.2);
+  --success: oklch(0.565 0.11 164.5);
+  --success-foreground: oklch(0.944 0.001 17.2);
+  --border: oklch(0.944 0.001 17.2 / 0.1);
+  --input: oklch(0.944 0.001 17.2 / 0.1);
+  --ring: oklch(0.652 0.214 38 / 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    margin: 0;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+}

@@ -1,0 +1,159 @@
+services:
+  # Detached prod app — only started with `docker compose --profile prod up`.
+  # Dev mode (`pnpm dev` / `vp dev`) skips this service: the host's
+  # TanStack Start dev server listens on 127.0.0.1:3221 instead. Either way,
+  # the cloudflared tunnel target `host.docker.internal:3221` reaches
+  # whichever process is bound there.
+  app:
+    profiles: ['prod']
+    build: .
+    container_name: shim-app
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${APP_PORT:-3221}:3221'
+    env_file: .env
+    environment:
+      # Server-side calls reach Convex via the docker network DNS name.
+      - CONVEX_SELF_HOSTED_URL=http://convex:3210
+      - CONVEX_SELF_HOSTED_ADMIN_KEY=${CONVEX_SELF_HOSTED_ADMIN_KEY}
+      # Browser-side: the bundle baked at build time uses the host loopback.
+      - VITE_CONVEX_URL=${VITE_CONVEX_URL:-http://127.0.0.1:3220}
+      - INTERNAL_URL=http://127.0.0.1:3221
+      # cloudflared metrics live on the docker network in this profile.
+      - CLOUDFLARED_METRICS_URL=http://cloudflared:2000
+    depends_on:
+      convex:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3221/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.5'
+
+  convex:
+    image: ghcr.io/get-convex/convex-backend:latest
+    container_name: shim-convex
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      # Bound to loopback only — both `vp dev` on the host and the local
+      # CLI reach Convex via 127.0.0.1:3220. Site-proxy on 3222 (shifted
+      # up by 10 from cctc's 3211 to avoid the cctc<->shim collision).
+      - '127.0.0.1:${CONVEX_PORT:-3220}:3210'
+      - '127.0.0.1:${CONVEX_SITE_PROXY_PORT:-3222}:3211'
+    volumes:
+      - shim-convex-data:/convex/data
+    environment:
+      - INSTANCE_NAME=${CONVEX_INSTANCE_NAME:-shim}
+      - INSTANCE_SECRET=${CONVEX_INSTANCE_SECRET:?Set CONVEX_INSTANCE_SECRET in .env}
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:${CONVEX_PORT:-3220}}
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://127.0.0.1:${CONVEX_SITE_PROXY_PORT:-3222}}
+      - DISABLE_BEACON=${CONVEX_DISABLE_BEACON:-true}
+      - DISABLE_METRICS_ENDPOINT=true
+      - RUST_LOG=${CONVEX_RUST_LOG:-info}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3210/version']
+      interval: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  convex-dashboard:
+    image: ghcr.io/get-convex/convex-dashboard:latest
+    container_name: shim-convex-dashboard
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - '127.0.0.1:${CONVEX_DASHBOARD_PORT:-6792}:6791'
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${CONVEX_DASHBOARD_DEPLOYMENT_URL:-http://127.0.0.1:${CONVEX_PORT:-3220}}
+    depends_on:
+      convex:
+        condition: service_healthy
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # cloudflared is gated behind `--profile tunnel` so the dev workflow
+  # (Convex only) does not start the tunnel by default. Start it with:
+  #   docker compose --profile tunnel up -d cloudflared
+  cloudflared:
+    image: cloudflare/cloudflared:2025.4.0
+    container_name: shim-cloudflared
+    profiles: ['tunnel', 'prod']
+    restart: unless-stopped
+    # `--metrics 0.0.0.0:2000` exposes the official cloudflared metrics +
+    # `/ready` JSON endpoint inside the container. We publish only
+    # 127.0.0.1:2001 on the host (shim uses 2001, cctc uses 2000) so both
+    # tunnels coexist without port collisions.
+    command: tunnel --metrics 0.0.0.0:2000 --protocol http2 run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
+    ports:
+      - '127.0.0.1:2001:2000'
+    networks:
+      - internal
+    extra_hosts:
+      # Public hostname `shim.lprieu.dev` points at
+      # `http://host.docker.internal:3221`. The tunnel hops back through
+      # the docker host-gateway to reach `vp dev` on the host.
+      - 'host.docker.internal:host-gateway'
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  shim-convex-data:
