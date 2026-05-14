@@ -19,7 +19,10 @@ export const CODEX_JWT_AUTH_CLAIM = 'https://api.openai.com/auth'
 
 export const CODEX_BASE_URL = 'https://chatgpt.com/backend-api/codex'
 export const CODEX_RESPONSES_URL = `${CODEX_BASE_URL}/responses`
-export const CODEX_USAGE_URL = `${CODEX_BASE_URL}/usage`
+// `/usage` lives off `/backend-api/wham`, NOT under `/codex` (see
+// openai/codex codex-rs/backend-client/src/client.rs::get_rate_limits_many).
+// Using `/codex/usage` returns a Cloudflare 403 HTML page.
+export const CODEX_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
 
 export const CODEX_USER_AGENT = 'codex_cli_rs/0.150.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464'
 export const CODEX_ORIGINATOR = 'codex_cli_rs'

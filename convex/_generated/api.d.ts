@@ -11,6 +11,7 @@
 import type * as helpers from '../helpers.js'
 import type * as oauthTokens from '../oauthTokens.js'
 import type * as pkceState from '../pkceState.js'
+import type * as planUsage from '../planUsage.js'
 import type * as requests from '../requests.js'
 import type * as shimSettings from '../shimSettings.js'
 
@@ -20,6 +21,7 @@ declare const fullApi: ApiFromModules<{
   helpers: typeof helpers
   oauthTokens: typeof oauthTokens
   pkceState: typeof pkceState
+  planUsage: typeof planUsage
   requests: typeof requests
   shimSettings: typeof shimSettings
 }>

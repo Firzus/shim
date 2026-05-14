@@ -25,6 +25,111 @@ interface InputItem {
   content?: unknown
 }
 
+// Chat-Completions content parts use `type: "text" | "image_url"`; the
+// Responses API expects `input_text` / `input_image` (user side) or
+// `output_text` (assistant side). This normalizes a string or content[]
+// payload to a Responses-shape content[].
+function normalizeContent(content: unknown, side: 'input' | 'output'): unknown[] {
+  if (typeof content === 'string') {
+    return [{ type: side === 'output' ? 'output_text' : 'input_text', text: content }]
+  }
+  if (!Array.isArray(content)) return []
+  const out: unknown[] = []
+  for (const raw of content) {
+    if (!raw || typeof raw !== 'object') continue
+    const part = raw as Record<string, unknown>
+    const type = typeof part.type === 'string' ? part.type : ''
+    if (type === 'text') {
+      out.push({ type: side === 'output' ? 'output_text' : 'input_text', text: part.text ?? '' })
+      continue
+    }
+    if (type === 'image_url') {
+      // Chat-shape: { type:'image_url', image_url:{ url } }. Responses-shape:
+      // { type:'input_image', image_url:'<url>' }.
+      const inner = part.image_url
+      const url =
+        typeof inner === 'string'
+          ? inner
+          : inner && typeof inner === 'object'
+            ? ((inner as Record<string, unknown>).url as string | undefined)
+            : undefined
+      if (url) out.push({ type: 'input_image', image_url: url })
+      continue
+    }
+    // Already in Responses shape (input_text / output_text / input_image / refusal /
+    // input_file / computer_screenshot / summary_text) — forward verbatim.
+    out.push(part)
+  }
+  return out
+}
+
+// Cursor BYOK falls back to Chat-Completions shape (`messages[]`, tool_calls
+// on assistant messages, tool-role messages for results) when the configured
+// model name isn't on its reasoning-model heuristic list — `codex` triggers
+// that fallback. We coerce to the Responses-shape `input[]` items Codex
+// expects so the rest of the passthrough can stay shape-agnostic.
+export function chatMessagesToInputItems(messages: unknown[]): InputItem[] {
+  const items: InputItem[] = []
+  for (const raw of messages) {
+    if (!raw || typeof raw !== 'object') continue
+    const m = raw as Record<string, unknown>
+    const role = m.role
+    if (role === 'tool') {
+      const out =
+        typeof m.content === 'string'
+          ? m.content
+          : extractTextFromContent(m.content) || JSON.stringify(m.content ?? '')
+      items.push({
+        type: 'function_call_output',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        call_id: m.tool_call_id as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        output: out as any,
+      } as InputItem)
+      continue
+    }
+    if (role === 'assistant') {
+      if (Array.isArray(m.tool_calls) && (m.tool_calls as unknown[]).length > 0) {
+        for (const tc of m.tool_calls as unknown[]) {
+          if (!tc || typeof tc !== 'object') continue
+          const t = tc as Record<string, unknown>
+          const fn = (t.function ?? {}) as Record<string, unknown>
+          items.push({
+            type: 'function_call',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            call_id: t.id as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name: fn.name as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            arguments: fn.arguments as any,
+          } as InputItem)
+        }
+        if (typeof m.content === 'string' && m.content.length > 0) {
+          items.push({
+            type: 'message',
+            role: 'assistant',
+            content: normalizeContent(m.content, 'output'),
+          })
+        }
+        continue
+      }
+      items.push({
+        type: 'message',
+        role: 'assistant',
+        content: normalizeContent(m.content, 'output'),
+      })
+      continue
+    }
+    // user / system / developer
+    items.push({
+      type: 'message',
+      role: typeof role === 'string' ? role : 'user',
+      content: normalizeContent(m.content, 'input'),
+    })
+  }
+  return items
+}
+
 function extractTextFromContent(content: unknown): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
@@ -76,7 +181,14 @@ export function buildCodexFromResponsesBody(
   const requestedModel = typeof rawBody.model === 'string' ? rawBody.model : ''
   const modelMapping = mapToCodexModel(requestedModel)
 
-  const rawInput = Array.isArray(rawBody.input) ? (rawBody.input as InputItem[]) : []
+  // Prefer the native Responses-shape `input[]`. If absent, fall back to
+  // converting Chat-shape `messages[]` — Cursor emits that when the model
+  // name (e.g. `codex`) isn't on its reasoning-model heuristic list.
+  const rawInput: InputItem[] = Array.isArray(rawBody.input)
+    ? (rawBody.input as InputItem[])
+    : Array.isArray(rawBody.messages)
+      ? chatMessagesToInputItems(rawBody.messages as unknown[])
+      : []
 
   const instructionsParts: string[] = []
   const passthroughInput: InputItem[] = []

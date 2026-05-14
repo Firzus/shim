@@ -43,6 +43,43 @@ interface Settings {
   }
 }
 
+interface RateLimitWindow {
+  limit_window_seconds: number
+  reset_after_seconds: number
+  reset_at: number
+  used_percent: number
+}
+
+interface RateLimit {
+  allowed: boolean
+  limit_reached: boolean
+  primary_window: RateLimitWindow | null
+  secondary_window: RateLimitWindow | null
+}
+
+interface AdditionalRateLimit {
+  limit_name: string
+  metered_feature?: string
+  rate_limit: RateLimit
+}
+
+interface UsageRaw {
+  plan_type?: string | null
+  rate_limit?: RateLimit | null
+  additional_rate_limits?: AdditionalRateLimit[] | null
+  credits?: {
+    balance?: string
+    has_credits?: boolean
+    unlimited?: boolean
+  } | null
+}
+
+interface UsageSnapshot {
+  capturedAt: number | null
+  raw: UsageRaw | null
+  stalenessMs: number | null
+}
+
 export const Route = createFileRoute('/')({ component: Dashboard })
 
 function formatExpiresIn(expiresAt: number | null): string {
@@ -55,10 +92,33 @@ function formatExpiresIn(expiresAt: number | null): string {
   return `${hours}h`
 }
 
+function formatAgo(ms: number | null): string {
+  if (ms === null || ms < 0) return '—'
+  if (ms < 60_000) return `${Math.round(ms / 1_000)}s`
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.round(minutes / 60)
+  return `${hours}h`
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  if (hours < 24) return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
+}
+
 function Dashboard() {
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
+  const [usage, setUsage] = useState<UsageSnapshot | null>(null)
+  const [usageRefreshing, setUsageRefreshing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [listenerActive, setListenerActive] = useState(false)
   const [fallbackUrl, setFallbackUrl] = useState('')
@@ -67,8 +127,13 @@ function Dashboard() {
   useEffect(() => {
     void refreshStatus()
     void refreshSettings()
+    void refreshUsage()
     const interval = setInterval(refreshStatus, 5_000)
-    return () => clearInterval(interval)
+    const usageInterval = setInterval(refreshUsage, 60_000)
+    return () => {
+      clearInterval(interval)
+      clearInterval(usageInterval)
+    }
   }, [])
 
   async function refreshStatus(): Promise<void> {
@@ -90,6 +155,34 @@ function Dashboard() {
       if (res.ok) setSettings((await res.json()) as Settings)
     } catch {
       // silent
+    }
+  }
+
+  async function refreshUsage(): Promise<void> {
+    try {
+      const res = await fetch('/api/usage')
+      if (res.ok) setUsage((await res.json()) as UsageSnapshot)
+    } catch {
+      // silent
+    }
+  }
+
+  async function forceRefreshUsage(): Promise<void> {
+    setUsageRefreshing(true)
+    try {
+      const res = await fetch('/api/usage', { method: 'POST' })
+      if (res.ok) setUsage((await res.json()) as UsageSnapshot)
+      else {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        setFeedback({ kind: 'error', message: body.error ?? 'usage refresh failed' })
+      }
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setUsageRefreshing(false)
     }
   }
 
@@ -307,6 +400,60 @@ function Dashboard() {
       </Card>
 
       <Card>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <CardTitle className="text-base">plan usage</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={usageRefreshing}
+            onClick={() => void forceRefreshUsage()}
+            data-testid="usage-refresh-btn"
+          >
+            {usageRefreshing ? 'refreshing…' : 'refresh'}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <p className="text-xs text-muted-foreground" data-testid="usage-staleness">
+            {usage?.capturedAt
+              ? `captured ${formatAgo(usage.stalenessMs)} ago${
+                  usage.raw?.plan_type ? ` · plan: ${usage.raw.plan_type}` : ''
+                }`
+              : 'no snapshot yet — poller runs every 5 min after auth'}
+          </p>
+          {usage?.raw?.rate_limit?.primary_window && (
+            <UsageWindow label="5h window" window={usage.raw.rate_limit.primary_window} />
+          )}
+          {usage?.raw?.rate_limit?.secondary_window && (
+            <UsageWindow label="weekly window" window={usage.raw.rate_limit.secondary_window} />
+          )}
+          {usage?.raw?.additional_rate_limits?.map((extra) => (
+            <div key={extra.limit_name} className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {extra.limit_name}
+              </p>
+              {extra.rate_limit.primary_window && (
+                <UsageWindow label="5h window" window={extra.rate_limit.primary_window} />
+              )}
+              {extra.rate_limit.secondary_window && (
+                <UsageWindow label="weekly window" window={extra.rate_limit.secondary_window} />
+              )}
+            </div>
+          ))}
+          {usage?.raw && (
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">raw payload</summary>
+              <pre
+                className="mt-2 max-h-72 overflow-auto rounded-md bg-muted/50 px-3 py-2 font-mono whitespace-pre-wrap"
+                data-testid="usage-raw"
+              >
+                {JSON.stringify(usage.raw, null, 2)}
+              </pre>
+            </details>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle className="text-base">model & reasoning</CardTitle>
         </CardHeader>
@@ -386,6 +533,27 @@ function SettingSelect({
         ))}
       </select>
     </label>
+  )
+}
+
+function UsageWindow({ label, window }: { label: string; window: RateLimitWindow }) {
+  const percent = Math.max(0, Math.min(100, window.used_percent))
+  const danger = percent >= 85
+  const warn = percent >= 60 && !danger
+  const barColor = danger ? 'bg-destructive' : warn ? 'bg-amber-500' : 'bg-emerald-500'
+  return (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between text-xs">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="font-mono text-muted-foreground">
+          {percent.toFixed(percent < 1 && percent > 0 ? 2 : 1)}% · resets in{' '}
+          {formatDuration(window.reset_after_seconds)}
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div className={`h-full ${barColor}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
   )
 }
 

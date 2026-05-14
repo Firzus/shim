@@ -52,15 +52,6 @@ const ALIASES: Record<string, string> = {
   o3: 'gpt-5.4',
   'o3-mini': 'gpt-5.4-mini',
   'o4-mini': 'gpt-5.4-mini',
-  // `gpt-5.4-as-*` family: Cursor refuses to enable agent mode on custom
-  // models whose name doesn't start with a recognized prefix. Names that
-  // start with `gpt-5.4-` are accepted as gpt-5.4 variants — we hijack that
-  // tolerance so the user can pin a specific Codex model and still get
-  // agent mode. Add via Cursor's "+ Add Custom Model" with these exact names.
-  'gpt-5.4-as-5.5': 'gpt-5.5',
-  'gpt-5.4-as-5.2': 'gpt-5.2',
-  'gpt-5.4-as-mini': 'gpt-5.4-mini',
-  'gpt-5.4-as-5.4': 'gpt-5.4',
 }
 
 export const ACCEPTED_CODEX_MODELS: readonly string[] = Array.from(KNOWN_CODEX_MODELS)
@@ -75,21 +66,6 @@ export function mapToCodexModel(requested: string | undefined): ModelMappingResu
   const trimmed = (requested ?? '').trim()
   if (!trimmed) {
     return { applied: CODEX_DEFAULT_MODEL, requested: '', fellBack: true }
-  }
-  // `shim-<codex-model>` aliases: Cursor's UI refuses to add custom models
-  // whose names collide with its built-in catalog (gpt-5.5 etc.), and built-ins
-  // don't always route through BYOK. The `shim-` prefix is a guaranteed
-  // non-collision that lets the user pin a specific Codex model in BYOK mode.
-  if (trimmed.startsWith('shim-')) {
-    const stripped = trimmed.slice('shim-'.length)
-    if (KNOWN_CODEX_MODELS.has(stripped)) {
-      return { applied: stripped, requested: trimmed, fellBack: false }
-    }
-    const aliased = ALIASES[stripped]
-    if (aliased) {
-      return { applied: aliased, requested: trimmed, fellBack: true }
-    }
-    return { applied: CODEX_DEFAULT_MODEL, requested: trimmed, fellBack: true }
   }
   if (KNOWN_CODEX_MODELS.has(trimmed)) {
     return { applied: trimmed, requested: trimmed, fellBack: false }

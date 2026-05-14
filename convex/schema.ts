@@ -84,12 +84,7 @@ export default defineSchema({
   shimSettings: defineTable({
     key: v.literal('singleton'),
     model: v.optional(v.string()),
-    reasoningEffort: v.optional(v.string()), // minimal|low|medium|high
-    // Legacy fields kept optional for backward compat with rows saved during
-    // the earlier dashboard iteration. Currently unused — the handler does not
-    // read or stamp them on the upstream body.
-    reasoningSummary: v.optional(v.string()),
-    verbosity: v.optional(v.string()),
+    reasoningEffort: v.optional(v.string()), // none|low|medium|high
     updatedAt: v.number(),
   }).index('by_key', ['key']),
 })

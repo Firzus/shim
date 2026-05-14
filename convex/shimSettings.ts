@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 import { SINGLETON_KEY, upsertShimSettings } from './helpers'
 import { mutation, query } from './_generated/server'
 
-// Dashboard-driven overrides for upstream calls (model, reasoning, verbosity).
+// Dashboard-driven overrides for upstream calls (model, reasoning effort).
 // Cursor sends `model: "codex"` as a sentinel; the proxy reads this singleton
-// and stamps the user's chosen Codex model + reasoning config onto the body
+// and stamps the user's chosen Codex model + reasoning effort onto the body
 // before forwarding. Unset fields fall back to defaults in
 // src/lib/server/settings.ts.
 

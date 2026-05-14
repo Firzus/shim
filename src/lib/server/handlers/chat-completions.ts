@@ -4,9 +4,10 @@ import { postCodexResponses } from '../codex-client'
 import { convex } from '../convex'
 import { logger, toErrorMessage } from '../logger'
 import { corsHeaders, ipWhitelistGuard, logRequestDetails } from '../middleware'
+// Side-effect import: bootstraps the plan-usage poller so proxy traffic alone
+// is enough to keep the snapshot fresh (no need for the dashboard to be open).
+import '../plan-usage-poller'
 import { getShimSettings } from '../settings'
-import { translateChatToResponses } from '../translation/chat-to-responses'
-import { adaptCursorResponsesBody } from '../translation/cursor-input-adapter'
 import { buildCodexFromResponsesBody } from '../translation/responses-passthrough'
 import {
   applyEventToBuffer,
@@ -15,7 +16,6 @@ import {
 } from '../translation/responses-to-chat'
 import { SSELineBuffer } from '../translation/sse-parser'
 import { createOpenAIStreamFromCodex } from '../translation/stream-translator'
-import type { OpenAIChatRequest } from '../translation/types'
 
 function openaiErrorBody(
   type: 'invalid_request_error' | 'internal_error' | 'api_error' | 'authentication_error',
@@ -61,9 +61,9 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     return new Response(null, { status: 204, headers: corsHeaders(req) })
   }
 
-  let body: OpenAIChatRequest
+  let rawBody: Record<string, unknown>
   try {
-    body = (await req.json()) as OpenAIChatRequest
+    rawBody = (await req.json()) as Record<string, unknown>
   } catch (error) {
     return Response.json(openaiErrorBody('invalid_request_error', toErrorMessage(error)), {
       status: 400,
@@ -75,53 +75,22 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   const conversationId = crypto.randomUUID()
   const streamId = `chatcmpl-${sessionId}`
 
-  // Cursor BYOK sends a Responses-API-shaped body at /v1/chat/completions for
-  // reasoning models. Detect it and bypass the Chat adapter entirely — going
-  // through Chat shape strips reasoning items' encrypted_content, which makes
-  // gpt-5.4 lose state and procrastinate forever on tool-using prompts.
-  const rawBody = body as unknown as Record<string, unknown>
-  const isResponsesShape = !Array.isArray(rawBody.messages) && Array.isArray(rawBody.input)
-
-  let translation: {
+  // Cursor BYOK always sends a Responses-API-shaped body at /v1/chat/completions:
+  // `input[]` items with `reasoning.encrypted_content` carry state across turns.
+  // Going through a Chat-shape adapter strips that and breaks tool-using prompts,
+  // so we forward verbatim.
+  const passthrough = buildCodexFromResponsesBody(rawBody, sessionId)
+  const translation: {
     body: Record<string, unknown>
     modelMapping: { requested: string; applied: string }
-  }
-  let toolDefsCount = 0
-
-  if (isResponsesShape) {
-    const passthrough = buildCodexFromResponsesBody(rawBody, sessionId)
-    translation = { body: passthrough.body, modelMapping: passthrough.modelMapping }
-    toolDefsCount = Array.isArray((passthrough.body as { tools?: unknown }).tools)
-      ? (passthrough.body as { tools: unknown[] }).tools.length
-      : 0
-    const reqModel = typeof rawBody.model === 'string' ? rawBody.model : ''
-    logger.info(
-      `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen}`,
-    )
-  } else {
-    // Legacy Chat-shape path (used by non-Cursor clients and the dashboard).
-    const adapt = adaptCursorResponsesBody(rawBody)
-    if (adapt.adapted) {
-      logger.info(
-        `[chat] adapted Responses-shape body (messages=${body.messages.length} dropped=${adapt.droppedItemCount})`,
-      )
-    }
-    if (!Array.isArray(body.messages) || body.messages.length === 0) {
-      return Response.json(
-        openaiErrorBody('invalid_request_error', '`messages` array is required and non-empty'),
-        { status: 400, headers: corsHeaders(req) },
-      )
-    }
-    const t = translateChatToResponses(body, sessionId)
-    translation = {
-      body: t.body as unknown as Record<string, unknown>,
-      modelMapping: t.modelMapping,
-    }
-    toolDefsCount = body.tools?.length ?? 0
-    logger.info(
-      `[chat] model="${body.model}" → "${t.modelMapping.applied}" tools=${toolDefsCount} stream=true messages=${body.messages.length}`,
-    )
-  }
+  } = { body: passthrough.body, modelMapping: passthrough.modelMapping }
+  const toolDefsCount = Array.isArray((passthrough.body as { tools?: unknown }).tools)
+    ? (passthrough.body as { tools: unknown[] }).tools.length
+    : 0
+  const reqModel = typeof rawBody.model === 'string' ? rawBody.model : ''
+  logger.info(
+    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen}`,
+  )
 
   // Apply dashboard-driven overrides last so they win over both the Cursor
   // body and the legacy model-map. Sentinel `model: "codex"` is the canonical
@@ -151,7 +120,13 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   }
   logger.info(`[chat] settings override model=${settings.model} effort=${settings.reasoningEffort}`)
 
-  const wantsStream = body.stream !== false
+  const wantsStream = rawBody.stream !== false
+  const streamOptions =
+    typeof rawBody.stream_options === 'object' && rawBody.stream_options !== null
+      ? (rawBody.stream_options as Record<string, unknown>)
+      : null
+  const includeUsage = streamOptions?.include_usage === true
+  const reportedModel = reqModel || translation.modelMapping.applied
 
   const startedAt = performance.now()
 
@@ -174,7 +149,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       error: message,
       requestedModel: translation.modelMapping.requested,
       appliedModel: translation.modelMapping.applied,
-      toolDefsCount: body.tools?.length ?? 0,
+      toolDefsCount,
     })
     return Response.json(openaiErrorBody('api_error', message), {
       status: 502,
@@ -187,7 +162,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       .clone()
       .text()
       .catch(() => 'unable to read upstream error body')
-    logger.error(`[chat] upstream ${upstream.status}: ${errorText.substring(0, 500)}`)
+    logger.error(`[chat] upstream ${upstream.status}: ${errorText.substring(0, 2000)}`)
     await recordRequestSafe({
       timestamp: Date.now(),
       model: translation.modelMapping.applied,
@@ -197,7 +172,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       error: `${upstream.status} ${errorText.substring(0, 200)}`,
       requestedModel: translation.modelMapping.requested,
       appliedModel: translation.modelMapping.applied,
-      toolDefsCount: body.tools?.length ?? 0,
+      toolDefsCount,
     })
     return Response.json(
       openaiErrorBody(
@@ -230,8 +205,8 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
 
     const translated = createOpenAIStreamFromCodex(upstream.body, {
       streamId,
-      reportedModel: body.model || translation.modelMapping.applied,
-      includeUsage: body.stream_options?.include_usage === true,
+      reportedModel,
+      includeUsage,
       onUsage: (usage) => {
         logger.info(
           `[chat] stream completed in=${usage.promptTokens} out=${usage.completionTokens} cached=${usage.cachedTokens ?? 0}`,
@@ -249,7 +224,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
           latencyMs: Math.round(performance.now() - startedAt),
           requestedModel: translation.modelMapping.requested,
           appliedModel: translation.modelMapping.applied,
-          toolDefsCount: body.tools?.length ?? 0,
+          toolDefsCount,
         })
       },
       onError: (message) => {
@@ -290,7 +265,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       error: buffer.errored,
       requestedModel: translation.modelMapping.requested,
       appliedModel: translation.modelMapping.applied,
-      toolDefsCount: body.tools?.length ?? 0,
+      toolDefsCount,
     })
     return Response.json(openaiErrorBody('api_error', buffer.errored), {
       status: 502,
@@ -298,11 +273,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     })
   }
 
-  const completion = bufferToCompletion(
-    buffer,
-    body.model || translation.modelMapping.applied,
-    streamId,
-  )
+  const completion = bufferToCompletion(buffer, reportedModel, streamId)
 
   await recordRequestSafe({
     timestamp: Date.now(),
@@ -317,7 +288,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     latencyMs: Math.round(performance.now() - startedAt),
     requestedModel: translation.modelMapping.requested,
     appliedModel: translation.modelMapping.applied,
-    toolDefsCount: body.tools?.length ?? 0,
+    toolDefsCount,
     toolCallCount: completion.choices[0]?.message.tool_calls?.length ?? 0,
   })
 
