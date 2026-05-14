@@ -25,21 +25,27 @@ export function StepWelcome({ onAdvance }: { onAdvance: () => void }) {
 
   useEffect(() => {
     let alive = true
+    let intervalId: ReturnType<typeof setInterval> | null = null
     const tick = async () => {
       try {
         const res = await fetch('/api/auth/status')
         if (!res.ok) return
         const data = (await res.json()) as AuthStatus
-        if (alive) setStatus(data)
+        if (!alive) return
+        setStatus(data)
+        if (data.authenticated && intervalId) {
+          clearInterval(intervalId)
+          intervalId = null
+        }
       } catch {
-        // silent
+        return
       }
     }
     void tick()
-    const id = setInterval(() => void tick(), 2_000)
+    intervalId = setInterval(() => void tick(), 2_000)
     return () => {
       alive = false
-      clearInterval(id)
+      if (intervalId) clearInterval(intervalId)
     }
   }, [])
 

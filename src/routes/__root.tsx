@@ -29,12 +29,8 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 })
 
-// Pathnames that render full-bleed (no header/footer). Currently just the
-// onboarding wizard — it has its own progress chrome.
-const FULL_BLEED_PREFIXES = ['/onboarding']
-
 function isFullBleed(pathname: string): boolean {
-  return FULL_BLEED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  return pathname === '/onboarding' || pathname.startsWith('/onboarding/')
 }
 
 function AppShell({ children }: { children: ReactNode }) {

@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 interface Settings {
@@ -125,7 +126,7 @@ function Picker({
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
       <div className="mt-3 flex flex-col gap-1.5">
         {options.length === 0 ? (
-          <div className="h-9 animate-pulse rounded-md bg-muted/50" />
+          <Skeleton className="h-9" />
         ) : (
           options.map((opt) => {
             const active = opt === value

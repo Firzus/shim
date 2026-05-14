@@ -1,19 +1,23 @@
 import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
-import { useMemo } from 'react'
 
 import { StepCursor } from '@/components/onboarding/step-cursor'
 import { StepModel } from '@/components/onboarding/step-model'
 import { StepTest } from '@/components/onboarding/step-test'
 import { StepTunnel } from '@/components/onboarding/step-tunnel'
 import { StepWelcome } from '@/components/onboarding/step-welcome'
-import { STEPS, STEP_LABEL, type OnboardingStep, stepIndex } from '@/lib/onboarding-state'
+import {
+  STEPS,
+  STEP_LABEL,
+  isOnboardingStep,
+  type OnboardingStep,
+  stepIndex,
+} from '@/lib/onboarding-state'
 
 export const Route = createFileRoute('/onboarding')({
   validateSearch: (search: Record<string, unknown>): { step: OnboardingStep } => {
     const raw = typeof search.step === 'string' ? search.step : ''
-    const step = (STEPS as string[]).includes(raw) ? (raw as OnboardingStep) : 'welcome'
-    return { step }
+    return { step: isOnboardingStep(raw) ? raw : 'welcome' }
   },
   component: OnboardingPage,
 })
@@ -33,23 +37,6 @@ function OnboardingPage() {
   function finish(): void {
     void navigate({ to: '/' })
   }
-
-  const current = useMemo(() => {
-    switch (step) {
-      case 'welcome':
-        return <StepWelcome onAdvance={() => go('model')} />
-      case 'model':
-        return <StepModel onAdvance={() => go('tunnel')} onBack={() => go('welcome')} />
-      case 'tunnel':
-        return <StepTunnel onAdvance={() => go('cursor')} onBack={() => go('model')} />
-      case 'cursor':
-        return <StepCursor onAdvance={() => go('test')} onBack={() => go('tunnel')} />
-      case 'test':
-        return <StepTest onAdvance={finish} onBack={() => go('cursor')} />
-      default:
-        return null
-    }
-  }, [step])
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -85,8 +72,29 @@ function OnboardingPage() {
       </header>
 
       <main className="flex-1">
-        <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">{current}</div>
+        <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+          {renderStep(step, go, finish)}
+        </div>
       </main>
     </div>
   )
+}
+
+function renderStep(
+  step: OnboardingStep,
+  go: (step: OnboardingStep) => void,
+  finish: () => void,
+): React.ReactNode {
+  switch (step) {
+    case 'welcome':
+      return <StepWelcome onAdvance={() => go('model')} />
+    case 'model':
+      return <StepModel onAdvance={() => go('tunnel')} onBack={() => go('welcome')} />
+    case 'tunnel':
+      return <StepTunnel onAdvance={() => go('cursor')} onBack={() => go('model')} />
+    case 'cursor':
+      return <StepCursor onAdvance={() => go('test')} onBack={() => go('tunnel')} />
+    case 'test':
+      return <StepTest onAdvance={finish} onBack={() => go('cursor')} />
+  }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { formatRelativeExpiry } from '@/lib/format-relative-expiry'
 import { cn } from '@/lib/utils'
 
 export interface AuthStatus {
@@ -22,19 +23,10 @@ function toneFor(status: AuthStatus | null): Tone {
 function labelFor(tone: Tone, status: AuthStatus | null): string {
   if (tone === 'idle') return 'checking…'
   if (tone === 'down') return 'disconnected — sign in with Codex'
-  if (tone === 'warn') return `token expires in ${formatIn(status?.expiresAt)} — re-auth soon`
+  if (tone === 'warn')
+    return `token expires in ${formatRelativeExpiry(status?.expiresAt)} — re-auth soon`
   return `connected${status?.planType ? ` · ${status.planType}` : ''}`
 }
-
-function formatIn(expiresAt: number | null | undefined): string {
-  if (!expiresAt) return '—'
-  const ms = expiresAt - Date.now()
-  if (ms <= 0) return 'expired'
-  const m = Math.round(ms / 60_000)
-  if (m < 60) return `${m}m`
-  return `${Math.round(m / 60)}h`
-}
-
 export function AuthStatusDot() {
   const [status, setStatus] = useState<AuthStatus | null>(null)
 

@@ -47,6 +47,10 @@ export function inferStep(p: OnboardingProbe): OnboardingStep {
   return 'test'
 }
 
+export function isOnboardingStep(value: string): value is OnboardingStep {
+  return STEPS.some((step) => step === value)
+}
+
 export function stepIndex(step: OnboardingStep): number {
   return STEPS.indexOf(step)
 }

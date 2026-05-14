@@ -3,6 +3,7 @@ import { Check, ExternalLink, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { CLOUDFLARED_TUNNEL_SNIPPET } from '@/lib/cursor-byok'
 
 interface Settings {
   tunnelUrl: string | null
@@ -68,9 +69,7 @@ export function StepTunnel({ onAdvance, onBack }: { onAdvance: () => void; onBac
       <div className="rounded-lg border border-border bg-card p-5 text-sm">
         <p className="font-medium">1. Start a tunnel</p>
         <pre className="mt-3 overflow-x-auto rounded-md bg-background px-3 py-2 font-mono text-xs">
-          {`cloudflared tunnel create shim
-cloudflared tunnel route dns shim shim.yourdomain.com
-cloudflared tunnel run shim   # ingress -> http://localhost:3221`}
+          {CLOUDFLARED_TUNNEL_SNIPPET}
         </pre>
         <p className="mt-3 text-xs text-muted-foreground">
           In the Cloudflare Zero Trust dashboard, restrict the tunnel route to{' '}

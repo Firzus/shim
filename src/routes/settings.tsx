@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import type { AuthStatus } from '@/components/auth-status-dot'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { formatRelativeExpiry } from '@/lib/format-relative-expiry'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
@@ -24,8 +25,6 @@ function SettingsPage() {
 
   useEffect(() => {
     void refresh()
-    const id = setInterval(refresh, 10_000)
-    return () => clearInterval(id)
   }, [])
 
   async function refresh(): Promise<void> {
@@ -52,6 +51,7 @@ function SettingsPage() {
         body: JSON.stringify({ [field]: value }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'save failed')
+      await refresh()
       toast.success(`${field === 'model' ? 'Model' : 'Reasoning'} updated`)
     } catch (error) {
       setSettings(prev)
@@ -115,7 +115,7 @@ function SettingsPage() {
           <dt className="text-muted-foreground">Plan</dt>
           <dd className="font-mono">{status?.planType ?? '—'}</dd>
           <dt className="text-muted-foreground">Token expires in</dt>
-          <dd className="font-mono">{formatIn(status?.expiresAt ?? null)}</dd>
+          <dd className="font-mono">{formatRelativeExpiry(status?.expiresAt)}</dd>
         </dl>
 
         <div className="pt-2">
@@ -189,13 +189,4 @@ function PickRow({
       </div>
     </div>
   )
-}
-
-function formatIn(expiresAt: number | null): string {
-  if (!expiresAt) return '—'
-  const ms = expiresAt - Date.now()
-  if (ms <= 0) return 'expired'
-  const m = Math.round(ms / 60_000)
-  if (m < 60) return `${m}m`
-  return `${Math.round(m / 60)}h`
 }

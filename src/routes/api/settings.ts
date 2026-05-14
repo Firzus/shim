@@ -2,13 +2,14 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { api } from '#/../convex/_generated/api'
 import { convex } from '#/lib/server/convex'
+import { ACCEPTED_CODEX_MODELS } from '#/lib/server/translation/model-map'
 import { invalidateShimSettingsCache, SHIM_SETTINGS_DEFAULTS } from '#/lib/server/settings'
 
 // Dashboard reads + writes the singleton that drives every upstream call's
 // model + reasoning effort. Cursor's body is overridden at request time by
 // src/lib/server/handlers/chat-completions.ts.
 
-const ALLOWED_MODELS = new Set(['gpt-5.2', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5'])
+const ALLOWED_MODELS = new Set(ACCEPTED_CODEX_MODELS)
 const ALLOWED_EFFORTS = new Set(['none', 'low', 'medium', 'high'])
 
 interface SettingsPayload {
@@ -46,10 +47,14 @@ function normalizeTunnelUrl(
   return { ok: true, value: `${url.protocol}//${url.host}` }
 }
 
-function resolveTunnelUrl(stored: string | null | undefined): string | null {
+function resolveTunnelUrl(stored: string | null | undefined): {
+  tunnelUrl: string | null
+  tunnelUrlSource: 'env' | 'settings' | null
+} {
   const envUrl = process.env.CLOUDFLARE_TUNNEL_URL?.trim()
-  if (envUrl) return envUrl
-  return stored && stored.length > 0 ? stored : null
+  if (envUrl) return { tunnelUrl: envUrl, tunnelUrlSource: 'env' }
+  if (stored) return { tunnelUrl: stored, tunnelUrlSource: 'settings' }
+  return { tunnelUrl: null, tunnelUrlSource: null }
 }
 
 export const Route = createFileRoute('/api/settings')({
@@ -57,12 +62,7 @@ export const Route = createFileRoute('/api/settings')({
     handlers: {
       GET: async () => {
         const row = await convex.query(api.shimSettings.get, {})
-        const tunnelUrl = resolveTunnelUrl(row?.tunnelUrl)
-        const tunnelUrlSource = process.env.CLOUDFLARE_TUNNEL_URL?.trim()
-          ? 'env'
-          : row?.tunnelUrl
-            ? 'settings'
-            : null
+        const { tunnelUrl, tunnelUrlSource } = resolveTunnelUrl(row?.tunnelUrl)
         return Response.json({
           model: row?.model ?? SHIM_SETTINGS_DEFAULTS.model,
           reasoningEffort: row?.reasoningEffort ?? SHIM_SETTINGS_DEFAULTS.reasoningEffort,
