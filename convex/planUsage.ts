@@ -30,3 +30,14 @@ export const save = mutation({
     await upsertPlanUsageSnapshot(ctx, args)
   },
 })
+
+export const clear = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query('planUsageSnapshot')
+      .withIndex('by_key', (q) => q.eq('key', SINGLETON_KEY))
+      .unique()
+    if (existing) await ctx.db.delete(existing._id)
+  },
+})

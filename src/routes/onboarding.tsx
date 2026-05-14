@@ -1,0 +1,92 @@
+import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
+import { ArrowLeft } from 'lucide-react'
+import { useMemo } from 'react'
+
+import { StepCursor } from '@/components/onboarding/step-cursor'
+import { StepModel } from '@/components/onboarding/step-model'
+import { StepTest } from '@/components/onboarding/step-test'
+import { StepTunnel } from '@/components/onboarding/step-tunnel'
+import { StepWelcome } from '@/components/onboarding/step-welcome'
+import { STEPS, STEP_LABEL, type OnboardingStep, stepIndex } from '@/lib/onboarding-state'
+
+export const Route = createFileRoute('/onboarding')({
+  validateSearch: (search: Record<string, unknown>): { step: OnboardingStep } => {
+    const raw = typeof search.step === 'string' ? search.step : ''
+    const step = (STEPS as string[]).includes(raw) ? (raw as OnboardingStep) : 'welcome'
+    return { step }
+  },
+  component: OnboardingPage,
+})
+
+function OnboardingPage() {
+  const navigate = useNavigate({ from: '/onboarding' })
+  const { step } = useSearch({ from: '/onboarding' })
+
+  const idx = stepIndex(step)
+  const total = STEPS.length
+  const progress = ((idx + 1) / total) * 100
+
+  function go(next: OnboardingStep): void {
+    void navigate({ to: '/onboarding', search: { step: next } })
+  }
+
+  function finish(): void {
+    void navigate({ to: '/' })
+  }
+
+  const current = useMemo(() => {
+    switch (step) {
+      case 'welcome':
+        return <StepWelcome onAdvance={() => go('model')} />
+      case 'model':
+        return <StepModel onAdvance={() => go('tunnel')} onBack={() => go('welcome')} />
+      case 'tunnel':
+        return <StepTunnel onAdvance={() => go('cursor')} onBack={() => go('model')} />
+      case 'cursor':
+        return <StepCursor onAdvance={() => go('test')} onBack={() => go('tunnel')} />
+      case 'test':
+        return <StepTest onAdvance={finish} onBack={() => go('cursor')} />
+      default:
+        return null
+    }
+  }, [step])
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="border-b border-border/60">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/logo-mark.png" alt="" className="size-6" width={24} height={24} />
+            <span className="font-mono text-sm font-bold tracking-tight">shim</span>
+          </Link>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3" />
+            Skip setup
+          </Link>
+        </div>
+        <div className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-mono uppercase tracking-wider text-muted-foreground">
+              Step {idx + 1} of {total}
+              <span className="ml-2 text-foreground">· {STEP_LABEL[step]}</span>
+            </span>
+            <span className="font-mono text-muted-foreground">{Math.round(progress)}%</span>
+          </div>
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full bg-primary transition-[width] duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">{current}</div>
+      </main>
+    </div>
+  )
+}
