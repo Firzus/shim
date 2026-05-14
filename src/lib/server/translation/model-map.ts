@@ -6,18 +6,28 @@ import { CODEX_DEFAULT_MODEL } from '../oauth/constants'
 // with a ChatGPT account.". Some newer models additionally require a bumped
 // `Version` header (see CODEX_VERSION in ../oauth/constants).
 //
-// Confirmed allowlist on prolite plan + Codex CLI v0.150.0:
-//  - gpt-5.2        ✓
-//  - gpt-5.4        ✓ (default)
-//  - gpt-5.4-mini   ✓
-//  - gpt-5.5        ✓ (requires Codex CLI >= 0.150)
+// Allowlist mirrors the model picker exposed by Cursor's BYOK UI on a paid
+// plan (Codex CLI >= 0.150):
+//  - gpt-5.2              ✓
+//  - gpt-5.3-codex        ✓ codex specialist
+//  - gpt-5.3-codex-spark  ✓ codex specialist, fast variant
+//  - gpt-5.4              ✓ flagship (default)
+//  - gpt-5.4-mini         ✓ cheap & fast
+//  - gpt-5.5              ✓ newest
 //
-// Confirmed REJECTED on this plan: gpt-5, gpt-5.0/.1/.3/.6, gpt-5-mini/-nano/
-// -pro/-thinking/-instant, gpt-5.4-nano, gpt-5.5-mini/-pro, gpt-5-codex, gpt-4o
-// family, gpt-4.1, o3 family, o4-mini. Higher subscription tiers may unlock
-// more — re-run the probe script if you upgrade and add findings here.
+// Confirmed REJECTED on lower tiers: gpt-5, gpt-5.0/.1/.6, gpt-5-mini/-nano/
+// -pro/-thinking/-instant, gpt-5.4-nano, gpt-5.5-mini/-pro, gpt-4o family,
+// gpt-4.1, o3 family, o4-mini. Re-run the probe script if your plan changes
+// and update findings here.
 
-const KNOWN_CODEX_MODELS = new Set<string>(['gpt-5.2', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5'])
+const KNOWN_CODEX_MODELS = new Set<string>([
+  'gpt-5.2',
+  'gpt-5.3-codex',
+  'gpt-5.3-codex-spark',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+  'gpt-5.5',
+])
 
 // Map Cursor-side names (and other unsupported variants) to the closest
 // accepted model so the user doesn't lose their flow when picking an
@@ -40,8 +50,8 @@ const ALIASES: Record<string, string> = {
   'gpt-5.4-nano': 'gpt-5.4-mini',
   'gpt-5.5-mini': 'gpt-5.4-mini',
   'gpt-5.5-pro': 'gpt-5.5',
-  // codex specialist → flagship (gpt-5-codex is plan-gated)
-  'gpt-5-codex': 'gpt-5.4',
+  // codex specialist → 5.3 codex (matches Cursor's "codex" routing)
+  'gpt-5-codex': 'gpt-5.3-codex',
   // gpt-4 family → flagship
   'gpt-4o': 'gpt-5.4',
   'gpt-4o-2024-11-20': 'gpt-5.4',

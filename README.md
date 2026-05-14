@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./public/logo-lockup.png" alt="shim" width="240" />
+  <img src="./public/logo-lockup-240.webp" alt="shim" width="240" />
 </p>
 
 <p align="center">

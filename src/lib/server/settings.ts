@@ -3,18 +3,13 @@ import { api } from '#/../convex/_generated/api'
 import { convex } from './convex'
 import { logger, toErrorMessage } from './logger'
 
-// Server-side cache around the `shimSettings` singleton. The dashboard mutates
-// it; the proxy reads it on every request. We cache for a short window so
-// rapid agent-loop turns don't hammer Convex, but keep the TTL low enough
-// that toggling the dashboard reflects quickly (TTL ms below).
-//
-// All upstream calls take their final `model`, `reasoning`, and `verbosity`
-// from here — Cursor's body is treated as best-effort hint, not source of
-// truth (the user explicitly opted into dashboard-driven control).
+// Short-lived cache around the dashboard-owned `shimSettings` singleton.
 
 const CACHE_TTL_MS = 3_000
 
-export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high'
+export const ACCEPTED_REASONING_EFFORTS = ['low', 'medium', 'high', 'extra-high'] as const
+
+export type ReasoningEffort = (typeof ACCEPTED_REASONING_EFFORTS)[number]
 
 export interface ShimSettings {
   model: string
@@ -23,21 +18,17 @@ export interface ShimSettings {
 
 const DEFAULTS: ShimSettings = {
   model: 'gpt-5.5',
-  reasoningEffort: 'medium',
+  reasoningEffort: 'high',
 }
 
 let cache: { value: ShimSettings; expiresAt: number } | null = null
 
+function isReasoningEffort(raw: string | null | undefined): raw is ReasoningEffort {
+  return typeof raw === 'string' && (ACCEPTED_REASONING_EFFORTS as readonly string[]).includes(raw)
+}
+
 function normalizeEffort(raw: string | null | undefined): ReasoningEffort {
-  switch (raw) {
-    case 'none':
-    case 'low':
-    case 'medium':
-    case 'high':
-      return raw
-    default:
-      return DEFAULTS.reasoningEffort
-  }
+  return isReasoningEffort(raw) ? raw : DEFAULTS.reasoningEffort
 }
 
 export async function getShimSettings(): Promise<ShimSettings> {

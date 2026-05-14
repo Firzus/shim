@@ -1,6 +1,7 @@
 import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 
+import { BrandLink } from '@/components/brand-link'
 import { StepCursor } from '@/components/onboarding/step-cursor'
 import { StepModel } from '@/components/onboarding/step-model'
 import { StepTest } from '@/components/onboarding/step-test'
@@ -42,10 +43,7 @@ function OnboardingPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2.5">
-            <img src="/logo-mark.png" alt="" className="size-6" width={24} height={24} />
-            <span className="font-mono text-sm font-bold tracking-tight">shim</span>
-          </Link>
+          <BrandLink textClassName="text-sm" />
           <Link
             to="/"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"

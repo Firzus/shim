@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatEffort, formatModel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 interface Settings {
@@ -14,15 +15,17 @@ interface Settings {
 }
 
 const EFFORT_TIPS: Record<string, string> = {
-  none: 'no thinking — fastest, cheapest',
   low: 'a little thinking',
-  medium: 'balanced (default)',
-  high: 'deep thinking — slower, smarter',
+  medium: 'balanced',
+  high: 'deep thinking (default)',
+  'extra-high': 'maximum reasoning — slowest',
 }
 
 const MODEL_TIPS: Record<string, string> = {
   'gpt-5.2': 'fast workhorse',
-  'gpt-5.4': 'flagship — recommended',
+  'gpt-5.3-codex': 'codex specialist',
+  'gpt-5.3-codex-spark': 'codex, faster',
+  'gpt-5.4': 'flagship',
   'gpt-5.4-mini': 'cheap & fast',
   'gpt-5.5': 'newest, most capable',
 }
@@ -37,7 +40,7 @@ export function StepModel({ onAdvance, onBack }: { onAdvance: () => void; onBack
         const res = await fetch('/api/settings')
         if (res.ok) setSettings((await res.json()) as Settings)
       } catch {
-        // silent
+        return
       }
     })()
   }, [])
@@ -79,6 +82,7 @@ export function StepModel({ onAdvance, onBack }: { onAdvance: () => void; onBack
           title="Model"
           options={settings?.allowed.models ?? []}
           tips={MODEL_TIPS}
+          formatLabel={formatModel}
           value={settings?.model ?? ''}
           disabled={!ready}
           onPick={(v) => void save('model', v)}
@@ -87,6 +91,7 @@ export function StepModel({ onAdvance, onBack }: { onAdvance: () => void; onBack
           title="Reasoning effort"
           options={settings?.allowed.efforts ?? []}
           tips={EFFORT_TIPS}
+          formatLabel={formatEffort}
           value={settings?.reasoningEffort ?? ''}
           disabled={!ready}
           onPick={(v) => void save('reasoningEffort', v)}
@@ -110,6 +115,7 @@ function Picker({
   title,
   options,
   tips,
+  formatLabel,
   value,
   disabled,
   onPick,
@@ -117,6 +123,7 @@ function Picker({
   title: string
   options: string[]
   tips: Record<string, string>
+  formatLabel: (id: string) => string
   value: string
   disabled: boolean
   onPick: (v: string) => void
@@ -143,7 +150,7 @@ function Picker({
                     : 'border-border bg-background hover:border-border hover:bg-muted/50',
                 )}
               >
-                <span className="font-mono">{opt}</span>
+                <span>{formatLabel(opt)}</span>
                 {tips[opt] ? (
                   <span className="text-xs text-muted-foreground">{tips[opt]}</span>
                 ) : null}

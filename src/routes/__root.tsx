@@ -2,7 +2,7 @@ import { HeadContent, Scripts, createRootRoute, useRouterState } from '@tanstack
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { Toaster } from 'sonner'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 import { DefaultCatchBoundary } from '@/components/default-catch-boundary'
 import { NotFound } from '@/components/not-found'
@@ -20,7 +20,7 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', type: 'image/png', href: '/logo-mark.png' },
+      { rel: 'icon', type: 'image/png', href: '/logo-mark-192.png' },
       { rel: 'manifest', href: '/manifest.json' },
     ],
   }),
@@ -56,11 +56,20 @@ function RootDocument({ children }: { children: ReactNode }) {
         <Toaster
           theme="dark"
           position="bottom-right"
-          toastOptions={{
-            classNames: {
-              toast: 'bg-card border border-border text-foreground',
-            },
-          }}
+          richColors
+          style={
+            {
+              '--normal-bg': 'var(--popover)',
+              '--normal-text': 'var(--popover-foreground)',
+              '--normal-border': 'var(--border)',
+              '--success-bg': 'var(--popover)',
+              '--success-text': 'var(--success)',
+              '--success-border': 'var(--border)',
+              '--error-bg': 'var(--popover)',
+              '--error-text': 'var(--destructive)',
+              '--error-border': 'var(--border)',
+            } as CSSProperties
+          }
         />
         <TanStackDevtools
           config={{ position: 'bottom-right' }}

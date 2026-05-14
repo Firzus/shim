@@ -7,6 +7,7 @@ import type { AuthStatus } from '@/components/auth-status-dot'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { formatRelativeExpiry } from '@/lib/format-relative-expiry'
+import { formatEffort, formatModel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
@@ -36,7 +37,7 @@ function SettingsPage() {
       if (s) setSettings(s as Settings)
       if (a) setStatus(a as AuthStatus)
     } catch {
-      // silent
+      return
     }
   }
 
@@ -87,12 +88,14 @@ function SettingsPage() {
           label="Model"
           value={settings?.model ?? ''}
           options={settings?.allowed.models ?? []}
+          formatLabel={formatModel}
           onPick={(v) => void save('model', v)}
         />
         <PickRow
           label="Reasoning effort"
           value={settings?.reasoningEffort ?? ''}
           options={settings?.allowed.efforts ?? []}
+          formatLabel={formatEffort}
           onPick={(v) => void save('reasoningEffort', v)}
         />
       </Section>
@@ -153,11 +156,13 @@ function PickRow({
   label,
   value,
   options,
+  formatLabel,
   onPick,
 }: {
   label: string
   value: string
   options: string[]
+  formatLabel: (id: string) => string
   onPick: (v: string) => void
 }) {
   return (
@@ -175,13 +180,13 @@ function PickRow({
                 type="button"
                 onClick={() => onPick(opt)}
                 className={cn(
-                  'rounded-md border px-3 py-1.5 font-mono text-sm transition-colors',
+                  'rounded-md border px-3 py-1.5 text-sm transition-colors',
                   active
                     ? 'border-primary/60 bg-primary/10 text-foreground'
                     : 'border-border bg-background text-muted-foreground hover:border-border hover:text-foreground',
                 )}
               >
-                {opt}
+                {formatLabel(opt)}
               </button>
             )
           })

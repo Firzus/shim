@@ -7,9 +7,7 @@ import type { AuthStatus } from '@/components/auth-status-dot'
 
 interface LoginResponse {
   authURL: string
-  state: string
   listenerActive: boolean
-  fallbackAvailable: boolean
 }
 
 interface FallbackResponse {
@@ -20,6 +18,7 @@ interface FallbackResponse {
 export function StepWelcome({ onAdvance }: { onAdvance: () => void }) {
   const [status, setStatus] = useState<AuthStatus | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pollingAuth, setPollingAuth] = useState(false)
   const [showFallback, setShowFallback] = useState(false)
   const [fallbackUrl, setFallbackUrl] = useState('')
 
@@ -33,21 +32,24 @@ export function StepWelcome({ onAdvance }: { onAdvance: () => void }) {
         const data = (await res.json()) as AuthStatus
         if (!alive) return
         setStatus(data)
-        if (data.authenticated && intervalId) {
-          clearInterval(intervalId)
-          intervalId = null
+        if (data.authenticated) {
+          setPollingAuth(false)
+          if (intervalId) {
+            clearInterval(intervalId)
+            intervalId = null
+          }
         }
       } catch {
         return
       }
     }
     void tick()
-    intervalId = setInterval(() => void tick(), 2_000)
+    if (pollingAuth) intervalId = setInterval(() => void tick(), 2_000)
     return () => {
       alive = false
       if (intervalId) clearInterval(intervalId)
     }
-  }, [])
+  }, [pollingAuth])
 
   const authenticated = status?.authenticated === true
 
@@ -58,6 +60,7 @@ export function StepWelcome({ onAdvance }: { onAdvance: () => void }) {
       if (!res.ok) throw new Error(`login init failed (${res.status})`)
       const data = (await res.json()) as LoginResponse
       setShowFallback(!data.listenerActive)
+      setPollingAuth(true)
       window.open(data.authURL, '_blank', 'noopener,noreferrer')
       toast.message('authorize tab opened', {
         description: data.listenerActive

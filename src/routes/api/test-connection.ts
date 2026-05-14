@@ -15,8 +15,7 @@ export const Route = createFileRoute('/api/test-connection')({
       POST: async () => {
         const startedAt = performance.now()
         const settings = await getShimSettings()
-        const sessionId = crypto.randomUUID()
-        const conversationId = crypto.randomUUID()
+        const testConnectionId = 'shim-test-connection'
 
         const body: Record<string, unknown> = {
           model: settings.model,
@@ -30,14 +29,16 @@ export const Route = createFileRoute('/api/test-connection')({
           ],
           stream: true,
           store: false,
-          prompt_cache_key: sessionId,
-        }
-        if (settings.reasoningEffort !== 'none') {
-          body.reasoning = { effort: settings.reasoningEffort }
+          prompt_cache_key: testConnectionId,
+          reasoning: { effort: settings.reasoningEffort },
         }
 
         try {
-          const upstream = await postCodexResponses({ body, sessionId, conversationId })
+          const upstream = await postCodexResponses({
+            body,
+            sessionId: testConnectionId,
+            conversationId: testConnectionId,
+          })
           if (!upstream.ok) {
             const text = await upstream
               .clone()

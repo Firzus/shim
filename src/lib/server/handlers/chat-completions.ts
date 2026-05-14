@@ -71,54 +71,43 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     })
   }
 
-  const sessionId = crypto.randomUUID()
-  const conversationId = crypto.randomUUID()
-  const streamId = `chatcmpl-${sessionId}`
-
   // Cursor BYOK always sends a Responses-API-shaped body at /v1/chat/completions:
   // `input[]` items with `reasoning.encrypted_content` carry state across turns.
   // Going through a Chat-shape adapter strips that and breaks tool-using prompts,
   // so we forward verbatim.
-  const passthrough = buildCodexFromResponsesBody(rawBody, sessionId)
-  const translation: {
-    body: Record<string, unknown>
-    modelMapping: { requested: string; applied: string }
-  } = { body: passthrough.body, modelMapping: passthrough.modelMapping }
-  const toolDefsCount = Array.isArray((passthrough.body as { tools?: unknown }).tools)
-    ? (passthrough.body as { tools: unknown[] }).tools.length
-    : 0
+  const passthrough = buildCodexFromResponsesBody(rawBody)
+  const promptCacheKey = passthrough.promptCacheKey
+
+  // Codex routes by Session_id / Conversation_id headers (not just the body's
+  // prompt_cache_key). Reusing the derived stable key across all three is what
+  // pins multi-turn Cursor traffic to the same upstream machine and unlocks
+  // real cache hits. The Codex CLI does the same thing within a process
+  // lifetime. streamId stays random — it's an OpenAI-side response identifier.
+  const sessionId = promptCacheKey
+  const conversationId = promptCacheKey
+  const streamId = `chatcmpl-${crypto.randomUUID()}`
+  const body = passthrough.body
+  const toolDefsCount = Array.isArray(body.tools) ? body.tools.length : 0
+  const requestedModel = passthrough.modelMapping.requested
+  let appliedModel = passthrough.modelMapping.applied
   const reqModel = typeof rawBody.model === 'string' ? rawBody.model : ''
-  logger.info(
-    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen}`,
+  logger.debug(
+    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen} cacheKey=${promptCacheKey}`,
   )
 
-  // Apply dashboard-driven overrides last so they win over both the Cursor
-  // body and the legacy model-map. Sentinel `model: "codex"` is the canonical
-  // value users type in Cursor; any other model name is overridden too — the
-  // dashboard is the single source of truth.
-  //
-  // We only stamp `model` and `reasoning.effort`; the rest of the `reasoning`
-  // object (summary, generate_summary, etc.) is left as whatever Cursor sent,
-  // so its agent-mode defaults still apply.
+  // Preserve Cursor's other `reasoning` fields while dashboard settings choose
+  // the final upstream model and effort.
   const settings = await getShimSettings()
-  translation.body.model = settings.model
-  if (settings.reasoningEffort === 'none') {
-    // Disable reasoning entirely — drop the whole object so Codex defaults
-    // to non-thinking mode for this turn.
-    delete translation.body.reasoning
-  } else {
-    const existingReasoning =
-      (translation.body.reasoning as Record<string, unknown> | undefined) ?? {}
-    translation.body.reasoning = {
-      ...existingReasoning,
-      effort: settings.reasoningEffort,
-    }
+  body.model = settings.model
+  const existingReasoning = (body.reasoning as Record<string, unknown> | undefined) ?? {}
+  body.reasoning = {
+    ...existingReasoning,
+    effort: settings.reasoningEffort,
   }
-  translation.modelMapping = {
-    requested: translation.modelMapping.requested,
-    applied: settings.model,
-  }
-  logger.info(`[chat] settings override model=${settings.model} effort=${settings.reasoningEffort}`)
+  appliedModel = settings.model
+  logger.debug(
+    `[chat] settings override model=${settings.model} effort=${settings.reasoningEffort}`,
+  )
 
   const wantsStream = rawBody.stream !== false
   const streamOptions =
@@ -126,14 +115,14 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       ? (rawBody.stream_options as Record<string, unknown>)
       : null
   const includeUsage = streamOptions?.include_usage === true
-  const reportedModel = reqModel || translation.modelMapping.applied
+  const reportedModel = reqModel || appliedModel
 
   const startedAt = performance.now()
 
   let upstream: Response
   try {
     upstream = await postCodexResponses({
-      body: translation.body,
+      body,
       sessionId,
       conversationId,
     })
@@ -142,13 +131,13 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     logger.error(`[chat] upstream transport failure: ${message}`)
     await recordRequestSafe({
       timestamp: Date.now(),
-      model: translation.modelMapping.applied,
+      model: appliedModel,
       source: 'error',
       stream: wantsStream,
       latencyMs: Math.round(performance.now() - startedAt),
       error: message,
-      requestedModel: translation.modelMapping.requested,
-      appliedModel: translation.modelMapping.applied,
+      requestedModel,
+      appliedModel,
       toolDefsCount,
     })
     return Response.json(openaiErrorBody('api_error', message), {
@@ -165,13 +154,13 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     logger.error(`[chat] upstream ${upstream.status}: ${errorText.substring(0, 2000)}`)
     await recordRequestSafe({
       timestamp: Date.now(),
-      model: translation.modelMapping.applied,
+      model: appliedModel,
       source: 'error',
       stream: wantsStream,
       latencyMs: Math.round(performance.now() - startedAt),
       error: `${upstream.status} ${errorText.substring(0, 200)}`,
-      requestedModel: translation.modelMapping.requested,
-      appliedModel: translation.modelMapping.applied,
+      requestedModel,
+      appliedModel,
       toolDefsCount,
     })
     return Response.json(
@@ -190,7 +179,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     })
   }
 
-  logger.info(`[chat] upstream ${upstream.status} stream=${wantsStream}`)
+  logger.debug(`[chat] upstream ${upstream.status} stream=${wantsStream}`)
 
   if (wantsStream) {
     const responseHeaders = new Headers(corsHeaders(req))
@@ -208,22 +197,22 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       reportedModel,
       includeUsage,
       onUsage: (usage) => {
-        logger.info(
+        logger.debug(
           `[chat] stream completed in=${usage.promptTokens} out=${usage.completionTokens} cached=${usage.cachedTokens ?? 0}`,
         )
         void recordRequestSafe({
           timestamp: Date.now(),
-          model: translation.modelMapping.applied,
+          model: appliedModel,
           source: 'cursor',
           stream: true,
           inputTokens: usage.promptTokens,
           outputTokens: usage.completionTokens,
           totalTokens: usage.totalTokens,
           cachedTokens: usage.cachedTokens,
-          promptCacheKey: sessionId,
+          promptCacheKey,
           latencyMs: Math.round(performance.now() - startedAt),
-          requestedModel: translation.modelMapping.requested,
-          appliedModel: translation.modelMapping.applied,
+          requestedModel,
+          appliedModel,
           toolDefsCount,
         })
       },
@@ -258,13 +247,13 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   if (buffer.errored) {
     await recordRequestSafe({
       timestamp: Date.now(),
-      model: translation.modelMapping.applied,
+      model: appliedModel,
       source: 'error',
       stream: false,
       latencyMs: Math.round(performance.now() - startedAt),
       error: buffer.errored,
-      requestedModel: translation.modelMapping.requested,
-      appliedModel: translation.modelMapping.applied,
+      requestedModel,
+      appliedModel,
       toolDefsCount,
     })
     return Response.json(openaiErrorBody('api_error', buffer.errored), {
@@ -277,17 +266,17 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
 
   await recordRequestSafe({
     timestamp: Date.now(),
-    model: translation.modelMapping.applied,
+    model: appliedModel,
     source: 'cursor',
     stream: false,
     inputTokens: completion.usage.prompt_tokens,
     outputTokens: completion.usage.completion_tokens,
     totalTokens: completion.usage.total_tokens,
     cachedTokens: completion.usage.prompt_tokens_details?.cached_tokens ?? null,
-    promptCacheKey: sessionId,
+    promptCacheKey,
     latencyMs: Math.round(performance.now() - startedAt),
-    requestedModel: translation.modelMapping.requested,
-    appliedModel: translation.modelMapping.applied,
+    requestedModel,
+    appliedModel,
     toolDefsCount,
     toolCallCount: completion.choices[0]?.message.tool_calls?.length ?? 0,
   })

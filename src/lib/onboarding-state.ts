@@ -1,6 +1,5 @@
-// Derived onboarding-completion state. There's no schema flag — the wizard
-// is "done" when the user is authenticated and has sent at least one cursor
-// request through the proxy. Step inference is used to deep-link `/onboarding`.
+// Derived onboarding-completion state. There's no schema flag; step inference
+// is used to deep-link `/onboarding`.
 
 export type OnboardingStep = 'welcome' | 'model' | 'tunnel' | 'cursor' | 'test'
 
@@ -36,7 +35,11 @@ export async function probeOnboarding(): Promise<OnboardingProbe> {
 }
 
 export function isOnboarded(p: OnboardingProbe): boolean {
-  return p.authenticated && p.hasTunnelUrl && p.cursorRequests > 0
+  // Onboarding is "done" once auth + tunnel are configured. We don't gate on
+  // cursorRequests > 0 because (a) the synthetic test-connection ping isn't
+  // recorded, and (b) clearing the analytics shouldn't bounce the user back
+  // into the wizard loop.
+  return p.authenticated && p.hasTunnelUrl
 }
 
 export function inferStep(p: OnboardingProbe): OnboardingStep {
@@ -53,14 +56,4 @@ export function isOnboardingStep(value: string): value is OnboardingStep {
 
 export function stepIndex(step: OnboardingStep): number {
   return STEPS.indexOf(step)
-}
-
-export function nextStep(step: OnboardingStep): OnboardingStep | null {
-  const i = stepIndex(step)
-  return i < 0 || i >= STEPS.length - 1 ? null : STEPS[i + 1]
-}
-
-export function prevStep(step: OnboardingStep): OnboardingStep | null {
-  const i = stepIndex(step)
-  return i <= 0 ? null : STEPS[i - 1]
 }

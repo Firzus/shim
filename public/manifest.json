@@ -3,7 +3,13 @@
   "name": "shim — codex byok proxy",
   "icons": [
     {
-      "src": "logo-mark.png",
+      "src": "logo-mark-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo-mark-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"

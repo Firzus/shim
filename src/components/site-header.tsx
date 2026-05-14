@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react'
 import { useState } from 'react'
 
 import { AuthStatusDot } from '@/components/auth-status-dot'
+import { BrandLink } from '@/components/brand-link'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
@@ -20,10 +21,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
-          <img src="/logo-mark.png" alt="" className="size-6" width={24} height={24} />
-          <span className="font-mono text-base font-bold tracking-tight">shim</span>
-        </Link>
+        <BrandLink className="transition-opacity hover:opacity-80" textClassName="text-base" />
 
         <nav className="hidden items-center gap-1 md:flex">
           {NAV.map((item) => {

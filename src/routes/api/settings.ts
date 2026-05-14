@@ -3,19 +3,23 @@ import { createFileRoute } from '@tanstack/react-router'
 import { api } from '#/../convex/_generated/api'
 import { convex } from '#/lib/server/convex'
 import { ACCEPTED_CODEX_MODELS } from '#/lib/server/translation/model-map'
-import { invalidateShimSettingsCache, SHIM_SETTINGS_DEFAULTS } from '#/lib/server/settings'
+import {
+  ACCEPTED_REASONING_EFFORTS,
+  invalidateShimSettingsCache,
+  SHIM_SETTINGS_DEFAULTS,
+} from '#/lib/server/settings'
 
 // Dashboard reads + writes the singleton that drives every upstream call's
 // model + reasoning effort. Cursor's body is overridden at request time by
 // src/lib/server/handlers/chat-completions.ts.
 
 const ALLOWED_MODELS = new Set(ACCEPTED_CODEX_MODELS)
-const ALLOWED_EFFORTS = new Set(['none', 'low', 'medium', 'high'])
+const ALLOWED_EFFORTS = new Set<string>(ACCEPTED_REASONING_EFFORTS)
 
 interface SettingsPayload {
   model?: string
   reasoningEffort?: string
-  tunnelUrl?: string | null
+  tunnelUrl?: string
 }
 
 // Validate & normalize a tunnel URL string. Cursor BYOK rejects private
@@ -94,7 +98,7 @@ export const Route = createFileRoute('/api/settings')({
         }
 
         let normalizedTunnel: string | undefined
-        if (body.tunnelUrl !== undefined && body.tunnelUrl !== null) {
+        if (body.tunnelUrl !== undefined) {
           const result = normalizeTunnelUrl(body.tunnelUrl)
           if (!result.ok) return Response.json({ error: result.error }, { status: 400 })
           normalizedTunnel = result.value
