@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -31,17 +31,28 @@ interface UsageSnapshot {
   stalenessMs: number | null
 }
 
+interface UsageState extends UsageSnapshot {
+  receivedAt: number
+}
+
 export function PlanUsageHero() {
-  const [usage, setUsage] = useState<UsageSnapshot | null>(null)
+  const [usage, setUsage] = useState<UsageState | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [loaded, setLoaded] = useState(false)
+
+  // No `now` ticker at this level on purpose: each live-tick UI piece
+  // (CapturedAgo, ResetCountdown) owns its own 1s setInterval so the parent
+  // and the memoized UsageRing/UsageBar don't re-render every second.
 
   useEffect(() => {
     let alive = true
     const tick = async () => {
       try {
         const res = await fetch('/api/usage')
-        if (res.ok && alive) setUsage((await res.json()) as UsageSnapshot)
+        if (res.ok && alive) {
+          const nextUsage = (await res.json()) as UsageSnapshot
+          setUsage({ ...nextUsage, receivedAt: Date.now() })
+        }
       } catch {
         // silent
       } finally {
@@ -60,7 +71,10 @@ export function PlanUsageHero() {
     setRefreshing(true)
     try {
       const res = await fetch('/api/usage', { method: 'POST' })
-      if (res.ok) setUsage((await res.json()) as UsageSnapshot)
+      if (res.ok) {
+        const nextUsage = (await res.json()) as UsageSnapshot
+        setUsage({ ...nextUsage, receivedAt: Date.now() })
+      }
     } catch {
       // silent
     } finally {
@@ -131,13 +145,19 @@ export function PlanUsageHero() {
       )}
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Captured {formatAgo(usage?.stalenessMs ?? null)} ago.
+        Captured {usage ? <CapturedAgo usage={usage} /> : 'just now'} ago.
       </p>
     </section>
   )
 }
 
-function UsageRing({ label, window: w }: { label: string; window: RateLimitWindow }) {
+const UsageRing = memo(function UsageRing({
+  label,
+  window: w,
+}: {
+  label: string
+  window: RateLimitWindow
+}) {
   const pct = Math.max(0, Math.min(100, w.used_percent))
   const tone = toneFor(pct)
   const stroke =
@@ -175,14 +195,20 @@ function UsageRing({ label, window: w }: { label: string; window: RateLimitWindo
         <span className="font-mono text-4xl font-semibold tabular-nums">{formatPct(pct)}</span>
         <span className="mt-1 text-xs text-muted-foreground">{label}</span>
         <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          resets in {formatDuration(w.reset_after_seconds)}
+          resets in <ResetCountdown resetAt={w.reset_at} />
         </span>
       </div>
     </div>
   )
-}
+})
 
-function UsageBar({ label, window: w }: { label: string; window: RateLimitWindow }) {
+const UsageBar = memo(function UsageBar({
+  label,
+  window: w,
+}: {
+  label: string
+  window: RateLimitWindow
+}) {
   const pct = Math.max(0, Math.min(100, w.used_percent))
   const tone = toneFor(pct)
   const bg = tone === 'danger' ? 'bg-destructive' : tone === 'warn' ? 'bg-amber-500' : 'bg-success'
@@ -191,7 +217,7 @@ function UsageBar({ label, window: w }: { label: string; window: RateLimitWindow
       <div className="flex items-baseline justify-between text-sm">
         <span className="font-medium">{label}</span>
         <span className="font-mono text-xs text-muted-foreground">
-          {formatPct(pct)} · resets in {formatDuration(w.reset_after_seconds)}
+          {formatPct(pct)} · resets in <ResetCountdown resetAt={w.reset_at} />
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -202,6 +228,27 @@ function UsageBar({ label, window: w }: { label: string; window: RateLimitWindow
       </div>
     </div>
   )
+})
+
+// Owns its own 1s ticker so it can re-render in isolation. The parent
+// PlanUsageHero never re-renders from this tick.
+function ResetCountdown({ resetAt }: { resetAt: number }) {
+  const now = useNow()
+  return <>{formatDuration(Math.max(0, Math.floor(resetAt - now / 1000)))}</>
+}
+
+function CapturedAgo({ usage }: { usage: UsageState }) {
+  const now = useNow()
+  return <>{formatAgo(getStalenessMs(usage, now))}</>
+}
+
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1_000)
+    return () => clearInterval(id)
+  }, [])
+  return now
 }
 
 function toneFor(pct: number): 'ok' | 'warn' | 'danger' {
@@ -232,4 +279,9 @@ function formatAgo(ms: number | null): string {
   const m = Math.round(ms / 60_000)
   if (m < 60) return `${m}m`
   return `${Math.round(m / 60)}h`
+}
+
+function getStalenessMs(usage: UsageState, now: number): number | null {
+  if (usage.stalenessMs === null) return null
+  return usage.stalenessMs + Math.max(0, now - usage.receivedAt)
 }

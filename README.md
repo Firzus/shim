@@ -63,19 +63,19 @@ Open the app at `http://127.0.0.1:3221` and follow the onboarding flow.
 
 ## Environment
 
-| Variable | Purpose |
-| --- | --- |
-| `CONVEX_INSTANCE_NAME` | Local Convex instance name. |
-| `CONVEX_INSTANCE_SECRET` | Required before the Convex container starts. |
-| `CONVEX_SELF_HOSTED_URL` | Server-side Convex URL, defaulting to `http://127.0.0.1:3220`. |
-| `CONVEX_SELF_HOSTED_ADMIN_KEY` | Admin key printed by local Convex. |
-| `VITE_CONVEX_URL` | Browser-side Convex URL. |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Required only when running the tunnel container profile. |
-| `APP_PORT` | App port, default `3221`. |
-| `CONVEX_PORT` | Convex backend port, default `3220`. |
-| `CONVEX_SITE_PROXY_PORT` | Convex site proxy port, default `3222`. |
-| `CONVEX_DASHBOARD_PORT` | Convex dashboard port, default `6792`. |
-| `ALLOWED_IPS` | Comma-separated proxy IP allow-list, or `disabled` for local development. |
+| Variable                       | Purpose                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------- |
+| `CONVEX_INSTANCE_NAME`         | Local Convex instance name.                                               |
+| `CONVEX_INSTANCE_SECRET`       | Required before the Convex container starts.                              |
+| `CONVEX_SELF_HOSTED_URL`       | Server-side Convex URL, defaulting to `http://127.0.0.1:3220`.            |
+| `CONVEX_SELF_HOSTED_ADMIN_KEY` | Admin key printed by local Convex.                                        |
+| `VITE_CONVEX_URL`              | Browser-side Convex URL.                                                  |
+| `CLOUDFLARE_TUNNEL_TOKEN`      | Required only when running the tunnel container profile.                  |
+| `APP_PORT`                     | App port, default `3221`.                                                 |
+| `CONVEX_PORT`                  | Convex backend port, default `3220`.                                      |
+| `CONVEX_SITE_PROXY_PORT`       | Convex site proxy port, default `3222`.                                   |
+| `CONVEX_DASHBOARD_PORT`        | Convex dashboard port, default `6792`.                                    |
+| `ALLOWED_IPS`                  | Comma-separated proxy IP allow-list, or `disabled` for local development. |
 
 ## Cursor BYOK setup
 

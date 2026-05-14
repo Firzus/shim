@@ -1,7 +1,6 @@
 import { HeadContent, Scripts, createRootRoute, useRouterState } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
 import { Toaster } from 'sonner'
+import { Suspense, lazy } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 
 import { DefaultCatchBoundary } from '@/components/default-catch-boundary'
@@ -9,6 +8,26 @@ import { NotFound } from '@/components/not-found'
 import { SiteFooter } from '@/components/site-footer'
 import { SiteHeader } from '@/components/site-header'
 import appCss from '../styles.css?url'
+
+// Devtools are dev-only. import.meta.env.DEV is a static boolean — Vite's
+// minifier drops the false-branch and tree-shakes the devtools packages out
+// of the prod bundle entirely.
+const Devtools = import.meta.env.DEV
+  ? lazy(async () => {
+      const [{ TanStackDevtools }, { TanStackRouterDevtoolsPanel }] = await Promise.all([
+        import('@tanstack/react-devtools'),
+        import('@tanstack/react-router-devtools'),
+      ])
+      return {
+        default: () => (
+          <TanStackDevtools
+            config={{ position: 'bottom-right' }}
+            plugins={[{ name: 'Tanstack Router', render: <TanStackRouterDevtoolsPanel /> }]}
+          />
+        ),
+      }
+    })
+  : () => null
 
 export const Route = createRootRoute({
   head: () => ({
@@ -71,15 +90,9 @@ function RootDocument({ children }: { children: ReactNode }) {
             } as CSSProperties
           }
         />
-        <TanStackDevtools
-          config={{ position: 'bottom-right' }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        <Suspense fallback={null}>
+          <Devtools />
+        </Suspense>
         <Scripts />
       </body>
     </html>

@@ -30,6 +30,18 @@ export default defineConfig({
     strictPort: true,
   },
 
+  build: {
+    target: 'es2022',
+    sourcemap: false,
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 600,
+    // Note: manualChunks is ignored by Vite+/Rolldown because codeSplitting is
+    // already enabled by the TanStack Start plugin. The bundler does automatic
+    // per-library splitting (.output/_libs/<pkg>.mjs) which is what we'd want
+    // anyway. If we ever need finer control we'd configure it via
+    // `codeSplitting` instead of `rollupOptions.output.manualChunks`.
+  },
+
   test: {
     environment: 'jsdom',
     globals: true,

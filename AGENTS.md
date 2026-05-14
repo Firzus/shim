@@ -1,9 +1,11 @@
 # AGENTS.md
 
 ## Overview & Scope
+
 shim is a private TypeScript/React 19 TanStack Start app that proxies Cursor BYOK chat completions to Codex/OpenAI-style endpoints, stores settings/analytics in Convex, and ships a Tailwind CSS v4 UI. Applies to the entire repo unless a nested `AGENTS.md` exists; closest `AGENTS.md` to the edited file wins.
 
 ## Agent Role
+
 - Act as an experienced TypeScript full-stack engineer for TanStack Start, React, Vite+, Convex, and Tailwind CSS.
 - Allowed: edit app code, Convex functions/schema, UI components, route handlers, tests, and local docs for requested work.
 - Must not: commit, push, deploy, run migrations, start tunnels, or change production/secrets/infra without explicit user approval.
@@ -24,6 +26,7 @@ docker compose --profile prod up -d app  # (unverified; production-like local co
 ```
 
 ## Conventions & Patterns
+
 - Package manager: `pnpm@11.1.2`; keep `pnpm-lock.yaml` authoritative.
 - Module style: ESM (`"type": "module"`), TypeScript strict mode, React JSX runtime.
 - Imports: prefer `#/...` or `@/...` aliases for `src/...`; both are configured in `tsconfig.json`.
@@ -38,6 +41,7 @@ docker compose --profile prod up -d app  # (unverified; production-like local co
 - Search: ignore `node_modules/`, `dist/`, `.git/`, and generated Convex files unless the task explicitly targets them.
 
 ## Dos and Don'ts
+
 - Do: keep `vite.config.ts` as the source for Vite+, test, lint, and format settings.
 - Do: preserve `server.host`, `server.port`, `strictPort`, and allowed tunnel hosts unless the user asks to change dev networking.
 - Do: use `vp` scripts through `pnpm` rather than invoking unrelated Vite/Vitest binaries.
@@ -50,6 +54,7 @@ docker compose --profile prod up -d app  # (unverified; production-like local co
 - Don't: introduce `any`; TypeScript strict/no-unused checks are enabled.
 
 ## Safety & Guardrails
+
 - Secrets/off-limits: `.env`, OAuth tokens, Convex admin keys, Cloudflare tunnel tokens, production data, and private user account identifiers.
 - Local logs: create debug logs only under `.cursor/`, never at repo root.
 - Safe to automate: reading files, scoped code edits, `pnpm --version`, `pnpm exec vp --version`, `pnpm exec tsc --version`, `git status`, `git diff`.
@@ -57,6 +62,7 @@ docker compose --profile prod up -d app  # (unverified; production-like local co
 - If starting long-running processes, clean them up before ending the session.
 
 ## Git & PR Rules
+
 - Branch: use the current branch; create/switch branches only when asked.
 - Commit: do not commit unless explicitly requested; recent style is short imperative/sentence case or conventional `feat:`.
 - Before commit: inspect `git status`, `git diff`, and recent log; do not include secrets or unrelated user changes.
