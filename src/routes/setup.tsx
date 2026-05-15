@@ -2,6 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, ExternalLink, RefreshCcw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { CompactSkillInstallCard } from '@/components/compact-skill-install-card'
 import { CursorByokInstructions } from '@/components/cursor-byok-instructions'
 import { Separator } from '@/components/ui/separator'
 import { CLOUDFLARED_TUNNEL_SNIPPET } from '@/lib/cursor-byok'
@@ -69,6 +70,19 @@ function SetupPage() {
         ) : null}
 
         <CursorByokInstructions tunnelUrl={tunnelUrl} />
+      </section>
+
+      <Separator />
+
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold tracking-tight">Agent hand-off</h2>
+          <p className="text-sm text-muted-foreground">
+            Cursor's /compact never reaches this proxy. Install the companion skill so your agent
+            handles summaries locally.
+          </p>
+        </div>
+        <CompactSkillInstallCard />
       </section>
 
       <Separator />

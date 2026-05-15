@@ -1,15 +1,16 @@
 // Derived onboarding-completion state. There's no schema flag; step inference
 // is used to deep-link `/onboarding`.
 
-export type OnboardingStep = 'welcome' | 'model' | 'tunnel' | 'cursor' | 'test'
+export type OnboardingStep = 'welcome' | 'model' | 'tunnel' | 'cursor' | 'skill' | 'test'
 
-export const STEPS: OnboardingStep[] = ['welcome', 'model', 'tunnel', 'cursor', 'test']
+export const STEPS: OnboardingStep[] = ['welcome', 'model', 'tunnel', 'cursor', 'skill', 'test']
 
 export const STEP_LABEL: Record<OnboardingStep, string> = {
   welcome: 'Connect ChatGPT',
   model: 'Pick a model',
   tunnel: 'Expose publicly',
   cursor: 'Configure Cursor',
+  skill: 'Install compact-shim',
   test: 'Test the connection',
 }
 

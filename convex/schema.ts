@@ -14,7 +14,7 @@ export default defineSchema({
   requests: defineTable({
     timestamp: v.number(),
     model: v.string(),
-    source: v.union(v.literal('cursor'), v.literal('error')),
+    source: v.union(v.literal('cursor'), v.literal('error'), v.literal('compact')),
     stream: v.boolean(),
 
     // OpenAI Responses usage. `total_tokens` mirrors the upstream summary;

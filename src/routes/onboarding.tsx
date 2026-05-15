@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { BrandLink } from '@/components/brand-link'
 import { StepCursor } from '@/components/onboarding/step-cursor'
 import { StepModel } from '@/components/onboarding/step-model'
+import { StepSkill } from '@/components/onboarding/step-skill'
 import { StepTest } from '@/components/onboarding/step-test'
 import { StepTunnel } from '@/components/onboarding/step-tunnel'
 import { StepWelcome } from '@/components/onboarding/step-welcome'
@@ -91,8 +92,10 @@ function renderStep(
     case 'tunnel':
       return <StepTunnel onAdvance={() => go('cursor')} onBack={() => go('model')} />
     case 'cursor':
-      return <StepCursor onAdvance={() => go('test')} onBack={() => go('tunnel')} />
+      return <StepCursor onAdvance={() => go('skill')} onBack={() => go('tunnel')} />
+    case 'skill':
+      return <StepSkill onAdvance={() => go('test')} onBack={() => go('cursor')} />
     case 'test':
-      return <StepTest onAdvance={finish} onBack={() => go('cursor')} />
+      return <StepTest onAdvance={finish} onBack={() => go('skill')} />
   }
 }

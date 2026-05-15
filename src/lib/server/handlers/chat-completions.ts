@@ -8,6 +8,7 @@ import { corsHeaders, ipWhitelistGuard, logRequestDetails } from '../middleware'
 // is enough to keep the snapshot fresh (no need for the dashboard to be open).
 import '../plan-usage-poller'
 import { getShimSettings } from '../settings'
+import { COMPACT_INSTRUCTIONS, detectCompactSentinel } from '../translation/compact-detect'
 import { buildCodexFromResponsesBody } from '../translation/responses-passthrough'
 import {
   applyEventToBuffer,
@@ -27,7 +28,7 @@ function openaiErrorBody(
 interface RecordRequestArgs {
   timestamp: number
   model: string
-  source: 'cursor' | 'error'
+  source: 'cursor' | 'error' | 'compact'
   stream: boolean
   inputTokens?: number | null
   outputTokens?: number | null
@@ -76,38 +77,47 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   // Going through a Chat-shape adapter strips that and breaks tool-using prompts,
   // so we forward verbatim.
   const passthrough = buildCodexFromResponsesBody(rawBody)
-  const promptCacheKey = passthrough.promptCacheKey
+  const body = passthrough.body
+
+  // /compact sentinel → summarization mode on a fresh cache lane.
+  const compact = detectCompactSentinel(passthrough.body.input as Array<Record<string, unknown>>)
+  const promptCacheKey = compact.matched ? crypto.randomUUID() : passthrough.promptCacheKey
+  if (compact.matched) {
+    body.input = compact.strippedInput
+    body.instructions = COMPACT_INSTRUCTIONS
+    body.prompt_cache_key = promptCacheKey
+    delete body.tools
+    delete body.tool_choice
+    delete body.parallel_tool_calls
+  }
+  const source: 'cursor' | 'compact' = compact.matched ? 'compact' : 'cursor'
 
   // Codex routes by Session_id / Conversation_id headers (not just the body's
-  // prompt_cache_key). Reusing the derived stable key across all three is what
-  // pins multi-turn Cursor traffic to the same upstream machine and unlocks
-  // real cache hits. The Codex CLI does the same thing within a process
-  // lifetime. streamId stays random — it's an OpenAI-side response identifier.
+  // prompt_cache_key). Reusing the derived stable key across all three pins
+  // multi-turn Cursor traffic to the same upstream machine and unlocks real
+  // cache hits. streamId stays random — it's an OpenAI-side response identifier.
   const sessionId = promptCacheKey
   const conversationId = promptCacheKey
   const streamId = `chatcmpl-${crypto.randomUUID()}`
-  const body = passthrough.body
   const toolDefsCount = Array.isArray(body.tools) ? body.tools.length : 0
   const requestedModel = passthrough.modelMapping.requested
   let appliedModel = passthrough.modelMapping.applied
   const reqModel = typeof rawBody.model === 'string' ? rawBody.model : ''
   logger.debug(
-    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen} cacheKey=${promptCacheKey}`,
+    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen} cacheKey=${promptCacheKey} mode=${source}`,
   )
 
-  // Preserve Cursor's other `reasoning` fields while dashboard settings choose
-  // the final upstream model and effort.
+  // Dashboard settings own model + effort. /compact caps effort at 'medium'.
   const settings = await getShimSettings()
   body.model = settings.model
   const existingReasoning = (body.reasoning as Record<string, unknown> | undefined) ?? {}
+  const effort = compact.matched ? 'medium' : settings.reasoningEffort
   body.reasoning = {
     ...existingReasoning,
-    effort: settings.reasoningEffort,
+    effort,
   }
   appliedModel = settings.model
-  logger.debug(
-    `[chat] settings override model=${settings.model} effort=${settings.reasoningEffort}`,
-  )
+  logger.debug(`[chat] settings override model=${settings.model} effort=${effort}`)
 
   const wantsStream = rawBody.stream !== false
   const streamOptions =
@@ -203,7 +213,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
         void recordRequestSafe({
           timestamp: Date.now(),
           model: appliedModel,
-          source: 'cursor',
+          source,
           stream: true,
           inputTokens: usage.promptTokens,
           outputTokens: usage.completionTokens,
@@ -267,7 +277,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   await recordRequestSafe({
     timestamp: Date.now(),
     model: appliedModel,
-    source: 'cursor',
+    source,
     stream: false,
     inputTokens: completion.usage.prompt_tokens,
     outputTokens: completion.usage.completion_tokens,
