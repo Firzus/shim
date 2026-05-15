@@ -67,7 +67,7 @@ Convex schema/codegen: after editing `convex/schema.ts` or any `convex/*.ts` fun
 - caps `reasoning.effort` at `medium`,
 - records the request with `source: 'compact'`.
 
-The sentinel is meant to be injected by a Cursor slash command (e.g. `.cursor/commands/compact.md`) — the protocol is owned here, the marker is versioned, and the detector ignores echoed history (only the *last* user message counts).
+The sentinel is meant to be injected by a Cursor slash command (e.g. `.cursor/commands/compact.md`) — the protocol is owned here, the marker is versioned, and the detector ignores echoed history (only the _last_ user message counts).
 
 ### OAuth flow
 

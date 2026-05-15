@@ -13,7 +13,11 @@ export const Route = createFileRoute('/api/analytics')({
         const now = Date.now()
         const since = now - sinceHours * 60 * 60 * 1000
         const analytics = await convex.query(api.requests.getAnalytics, { since, now })
-        return Response.json(analytics)
+        return Response.json(analytics, {
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+        })
       },
     },
   },

@@ -96,33 +96,33 @@ Cursor rejects `localhost` and other private network URLs. Point the tunnel ingr
 
 The `.env.example` file is the source of truth for local configuration.
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `CONVEX_INSTANCE_NAME` | yes | Local Convex instance name. Defaults to `shim` in examples. |
-| `CONVEX_INSTANCE_SECRET` | yes | Secret required before the Convex backend container starts. |
-| `CONVEX_SELF_HOSTED_URL` | yes | Server-side Convex URL, usually `http://127.0.0.1:3220` in local dev. |
-| `CONVEX_SELF_HOSTED_ADMIN_KEY` | yes | Admin key printed by the local Convex backend. |
-| `VITE_CONVEX_URL` | yes | Browser-side Convex URL baked into the client bundle. |
-| `CLOUDFLARE_TUNNEL_TOKEN` | only for tunnel profile | Token used by the `cloudflared` Docker profile. |
-| `CLOUDFLARE_TUNNEL_URL` | no | Public origin shown in setup and allowed by CORS. |
-| `ALLOWED_IPS` | no | Comma-separated allow-list for proxy endpoints; use `disabled` only for local testing. |
-| `ALLOWED_ORIGIN` | no | Additional comma-separated CORS origins. |
-| `SHIM_MAX_UPSTREAM_CONCURRENCY` | no | Maximum upstream Codex requests in flight. Defaults to `3`. |
-| `APP_PORT` | no | App port. Defaults to `3221`. |
-| `CONVEX_PORT` | no | Local Convex backend port. Defaults to `3220`. |
-| `CONVEX_SITE_PROXY_PORT` | no | Local Convex site proxy port. Defaults to `3222`. |
-| `CONVEX_DASHBOARD_PORT` | no | Local Convex dashboard port. Defaults to `6792`. |
+| Variable                        | Required                | Description                                                                            |
+| ------------------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
+| `CONVEX_INSTANCE_NAME`          | yes                     | Local Convex instance name. Defaults to `shim` in examples.                            |
+| `CONVEX_INSTANCE_SECRET`        | yes                     | Secret required before the Convex backend container starts.                            |
+| `CONVEX_SELF_HOSTED_URL`        | yes                     | Server-side Convex URL, usually `http://127.0.0.1:3220` in local dev.                  |
+| `CONVEX_SELF_HOSTED_ADMIN_KEY`  | yes                     | Admin key printed by the local Convex backend.                                         |
+| `VITE_CONVEX_URL`               | yes                     | Browser-side Convex URL baked into the client bundle.                                  |
+| `CLOUDFLARE_TUNNEL_TOKEN`       | only for tunnel profile | Token used by the `cloudflared` Docker profile.                                        |
+| `CLOUDFLARE_TUNNEL_URL`         | no                      | Public origin shown in setup and allowed by CORS.                                      |
+| `ALLOWED_IPS`                   | no                      | Comma-separated allow-list for proxy endpoints; use `disabled` only for local testing. |
+| `ALLOWED_ORIGIN`                | no                      | Additional comma-separated CORS origins.                                               |
+| `SHIM_MAX_UPSTREAM_CONCURRENCY` | no                      | Maximum upstream Codex requests in flight. Defaults to `3`.                            |
+| `APP_PORT`                      | no                      | App port. Defaults to `3221`.                                                          |
+| `CONVEX_PORT`                   | no                      | Local Convex backend port. Defaults to `3220`.                                         |
+| `CONVEX_SITE_PROXY_PORT`        | no                      | Local Convex site proxy port. Defaults to `3222`.                                      |
+| `CONVEX_DASHBOARD_PORT`         | no                      | Local Convex dashboard port. Defaults to `6792`.                                       |
 
 ## Scripts
 
-| Command | Description |
-| --- | --- |
-| `pnpm dev` | Start the TanStack Start dev server on `127.0.0.1:3221`. |
-| `pnpm build` | Build the app with Vite+. |
-| `pnpm preview` | Preview the built app with Vite+. |
-| `pnpm test` | Run the Vitest suite through `vp test run`. |
-| `pnpm convex:deploy` | Run local Convex schema/function sync with `vpx convex dev --once`. |
-| `pnpm exec vp check --no-fmt` | Run the same lint and type-aware checks used by CI. |
+| Command                       | Description                                                         |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `pnpm dev`                    | Start the TanStack Start dev server on `127.0.0.1:3221`.            |
+| `pnpm build`                  | Build the app with Vite+.                                           |
+| `pnpm preview`                | Preview the built app with Vite+.                                   |
+| `pnpm test`                   | Run the Vitest suite through `vp test run`.                         |
+| `pnpm convex:deploy`          | Run local Convex schema/function sync with `vpx convex dev --once`. |
+| `pnpm exec vp check --no-fmt` | Run the same lint and type-aware checks used by CI.                 |
 
 ## Docker profiles
 
@@ -138,20 +138,20 @@ docker compose --profile prod up -d app
 
 ## API surface
 
-| Endpoint | Purpose |
-| --- | --- |
-| `POST /v1/chat/completions` | OpenAI-compatible chat completion proxy for Cursor BYOK. |
-| `POST /api/v1/chat/completions` | API-prefixed mirror of the chat completion proxy. |
-| `GET /v1/models` | OpenAI-style model list including the `codex` sentinel. |
-| `GET /api/health` | Health check endpoint. |
-| `GET /api/settings` | Read dashboard model, reasoning, and tunnel settings. |
-| `POST /api/settings` | Update dashboard model, reasoning, and tunnel settings. |
-| `GET /api/usage` | Read the latest plan usage snapshot. |
-| `POST /api/usage` | Trigger a manual plan usage refresh. |
-| `GET /api/auth/login` | Start the Codex OAuth flow. |
-| `GET /api/auth/callback` | Complete the Codex OAuth callback. |
-| `GET /api/auth/status` | Check whether a Codex session is available. |
-| `GET /api/auth/logout` | Clear the stored Codex OAuth session. |
+| Endpoint                        | Purpose                                                  |
+| ------------------------------- | -------------------------------------------------------- |
+| `POST /v1/chat/completions`     | OpenAI-compatible chat completion proxy for Cursor BYOK. |
+| `POST /api/v1/chat/completions` | API-prefixed mirror of the chat completion proxy.        |
+| `GET /v1/models`                | OpenAI-style model list including the `codex` sentinel.  |
+| `GET /api/health`               | Health check endpoint.                                   |
+| `GET /api/settings`             | Read dashboard model, reasoning, and tunnel settings.    |
+| `POST /api/settings`            | Update dashboard model, reasoning, and tunnel settings.  |
+| `GET /api/usage`                | Read the latest plan usage snapshot.                     |
+| `POST /api/usage`               | Trigger a manual plan usage refresh.                     |
+| `GET /api/auth/login`           | Start the Codex OAuth flow.                              |
+| `GET /api/auth/callback`        | Complete the Codex OAuth callback.                       |
+| `GET /api/auth/status`          | Check whether a Codex session is available.              |
+| `GET /api/auth/logout`          | Clear the stored Codex OAuth session.                    |
 
 ## Project structure
 

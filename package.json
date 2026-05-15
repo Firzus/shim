@@ -10,6 +10,8 @@
     "dev": "vp dev",
     "build": "vp build",
     "preview": "vp preview",
+    "check": "vp check",
+    "fmt": "vp fmt",
     "test": "vp test run",
     "prepare": "node -e \"require('node:fs').existsSync('.git') && require('node:child_process').execSync('vp config', { stdio: 'inherit' })\"",
     "convex:deploy": "vpx convex dev --once"
