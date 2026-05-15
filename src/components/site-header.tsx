@@ -4,14 +4,16 @@ import { useState } from 'react'
 
 import { AuthStatusDot } from '@/components/auth-status-dot'
 import { BrandLink } from '@/components/brand-link'
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { m } from '@/paraglide/messages'
 import { cn } from '@/lib/utils'
 
 const NAV = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/setup', label: 'Setup' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/', label: m.nav_dashboard },
+  { to: '/setup', label: m.nav_setup },
+  { to: '/settings', label: m.nav_settings },
 ] as const
 
 export function SiteHeader() {
@@ -37,19 +39,20 @@ export function SiteHeader() {
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 )}
               >
-                {item.label}
+                {item.label()}
               </Link>
             )
           })}
         </nav>
 
         <div className="flex items-center gap-1">
+          <LanguageSwitcher className="hidden sm:inline-flex" />
           <AuthStatusDot />
           <div className="md:hidden">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger
                 render={
-                  <Button variant="ghost" size="icon-sm" aria-label="open menu">
+                  <Button variant="ghost" size="icon-sm" aria-label={m.nav_open_menu()}>
                     <Menu />
                   </Button>
                 }
@@ -70,10 +73,11 @@ export function SiteHeader() {
                             : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                         )}
                       >
-                        {item.label}
+                        {item.label()}
                       </Link>
                     )
                   })}
+                  <LanguageSwitcher className="mt-3" />
                 </div>
               </SheetContent>
             </Sheet>

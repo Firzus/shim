@@ -1,68 +1,43 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSaveSettings } from '@/lib/api/mutations'
+import { settingsQuery } from '@/lib/api/queries'
+import { m } from '@/paraglide/messages'
 import { formatEffort, formatModel } from '@/lib/labels'
-import { cn } from '@/lib/utils'
+import { cn, errorMessage } from '@/lib/utils'
 
-interface Settings {
-  model: string
-  reasoningEffort: string
-  updatedAt: number | null
-  allowed: { models: string[]; efforts: string[] }
+const EFFORT_TIPS: Record<string, () => string> = {
+  low: m.effort_tip_low,
+  medium: m.effort_tip_medium,
+  high: m.effort_tip_high,
+  'extra-high': m.effort_tip_extra_high,
 }
 
-const EFFORT_TIPS: Record<string, string> = {
-  low: 'a little thinking',
-  medium: 'balanced',
-  high: 'deep thinking (default)',
-  'extra-high': 'maximum reasoning — slowest',
-}
-
-const MODEL_TIPS: Record<string, string> = {
-  'gpt-5.2': 'fast workhorse',
-  'gpt-5.3-codex': 'codex specialist',
-  'gpt-5.3-codex-spark': 'codex, faster',
-  'gpt-5.4': 'flagship',
-  'gpt-5.4-mini': 'cheap & fast',
-  'gpt-5.5': 'newest, most capable',
+const MODEL_TIPS: Record<string, () => string> = {
+  'gpt-5.2': m.model_tip_gpt52,
+  'gpt-5.3-codex': m.model_tip_gpt53_codex,
+  'gpt-5.3-codex-spark': m.model_tip_gpt53_codex_spark,
+  'gpt-5.4': m.model_tip_gpt54,
+  'gpt-5.4-mini': m.model_tip_gpt54_mini,
+  'gpt-5.5': m.model_tip_gpt55,
 }
 
 export function StepModel({ onAdvance, onBack }: { onAdvance: () => void; onBack: () => void }) {
-  const [settings, setSettings] = useState<Settings | null>(null)
-  const [saving, setSaving] = useState(false)
+  const { data: settings } = useQuery(settingsQuery())
+  // Optimistic update + rollback live in useSaveSettings.
+  const saveSettings = useSaveSettings()
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch('/api/settings')
-        if (res.ok) setSettings((await res.json()) as Settings)
-      } catch {
-        return
-      }
-    })()
-  }, [])
-
-  async function save(field: 'model' | 'reasoningEffort', value: string): Promise<void> {
-    if (!settings) return
-    const previous = settings
-    setSettings({ ...settings, [field]: value })
-    setSaving(true)
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value }),
-      })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'save failed')
-    } catch (error) {
-      setSettings(previous)
-      toast.error(error instanceof Error ? error.message : String(error))
-    } finally {
-      setSaving(false)
-    }
+  function save(field: 'model' | 'reasoningEffort', value: string): void {
+    saveSettings.mutate(
+      { [field]: value },
+      {
+        onError: (error) => toast.error(errorMessage(error)),
+      },
+    )
   }
 
   const ready = settings && settings.allowed.models.length > 0
@@ -70,41 +45,38 @@ export function StepModel({ onAdvance, onBack }: { onAdvance: () => void; onBack
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Pick a model</h1>
-        <p className="text-base text-muted-foreground">
-          shim overrides whatever Cursor sends with the model you choose here. You can change it any
-          time from Settings.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{m.model_title()}</h1>
+        <p className="text-base text-muted-foreground">{m.model_subtitle()}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Picker
-          title="Model"
+          title={m.model_picker_model()}
           options={settings?.allowed.models ?? []}
           tips={MODEL_TIPS}
           formatLabel={formatModel}
           value={settings?.model ?? ''}
           disabled={!ready}
-          onPick={(v) => void save('model', v)}
+          onPick={(v) => save('model', v)}
         />
         <Picker
-          title="Reasoning effort"
+          title={m.model_picker_effort()}
           options={settings?.allowed.efforts ?? []}
           tips={EFFORT_TIPS}
           formatLabel={formatEffort}
           value={settings?.reasoningEffort ?? ''}
           disabled={!ready}
-          onPick={(v) => void save('reasoningEffort', v)}
+          onPick={(v) => save('reasoningEffort', v)}
         />
       </div>
 
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack}>
-          Back
+          {m.common_back()}
         </Button>
         <Button onClick={onAdvance} disabled={!ready}>
-          {saving ? <Loader2 className="animate-spin" /> : null}
-          Continue
+          {saveSettings.isPending ? <Loader2 className="animate-spin" /> : null}
+          {m.common_continue()}
         </Button>
       </div>
     </div>
@@ -122,7 +94,7 @@ function Picker({
 }: {
   title: string
   options: string[]
-  tips: Record<string, string>
+  tips: Record<string, () => string>
   formatLabel: (id: string) => string
   value: string
   disabled: boolean
@@ -152,7 +124,7 @@ function Picker({
               >
                 <span>{formatLabel(opt)}</span>
                 {tips[opt] ? (
-                  <span className="text-xs text-muted-foreground">{tips[opt]}</span>
+                  <span className="text-xs text-muted-foreground">{tips[opt]()}</span>
                 ) : null}
               </button>
             )

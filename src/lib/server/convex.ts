@@ -5,19 +5,12 @@ import { ConvexHttpClient } from 'convex/browser'
 
 let cached: ConvexHttpClient | null = null
 
-function resolveUrl(): string {
-  const url =
-    process.env.CONVEX_SELF_HOSTED_URL ?? process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL
-  if (!url) {
-    throw new Error(
-      'CONVEX_SELF_HOSTED_URL or VITE_CONVEX_URL must be set (run `pnpm convex:deploy` once).',
-    )
-  }
-  return url
-}
+// Defaults to the host loopback; the `app` container overrides it with the
+// docker-network DNS name (CONVEX_SELF_HOSTED_URL=http://convex:3210).
+const CONVEX_URL = process.env.CONVEX_SELF_HOSTED_URL ?? 'http://127.0.0.1:3220'
 
 function getClient(): ConvexHttpClient {
-  if (!cached) cached = new ConvexHttpClient(resolveUrl())
+  if (!cached) cached = new ConvexHttpClient(CONVEX_URL)
   return cached
 }
 

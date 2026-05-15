@@ -94,24 +94,21 @@ Cursor rejects `localhost` and other private network URLs. Point the tunnel ingr
 
 ## Configuration
 
-The `.env.example` file is the source of truth for local configuration.
+The `.env.example` file is the source of truth for local configuration — six
+variables, all listed below. Ports and other fixed values are baked into
+`docker-compose.yml`.
 
-| Variable                        | Required                | Description                                                                            |
-| ------------------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
-| `CONVEX_INSTANCE_NAME`          | yes                     | Local Convex instance name. Defaults to `shim` in examples.                            |
-| `CONVEX_INSTANCE_SECRET`        | yes                     | Secret required before the Convex backend container starts.                            |
-| `CONVEX_SELF_HOSTED_URL`        | yes                     | Server-side Convex URL, usually `http://127.0.0.1:3220` in local dev.                  |
-| `CONVEX_SELF_HOSTED_ADMIN_KEY`  | yes                     | Admin key printed by the local Convex backend.                                         |
-| `VITE_CONVEX_URL`               | yes                     | Browser-side Convex URL baked into the client bundle.                                  |
-| `CLOUDFLARE_TUNNEL_TOKEN`       | only for tunnel profile | Token used by the `cloudflared` Docker profile.                                        |
-| `CLOUDFLARE_TUNNEL_URL`         | no                      | Public origin shown in setup and allowed by CORS.                                      |
-| `ALLOWED_IPS`                   | no                      | Comma-separated allow-list for proxy endpoints; use `disabled` only for local testing. |
-| `ALLOWED_ORIGIN`                | no                      | Additional comma-separated CORS origins.                                               |
-| `SHIM_MAX_UPSTREAM_CONCURRENCY` | no                      | Maximum upstream Codex requests in flight. Defaults to `3`.                            |
-| `APP_PORT`                      | no                      | App port. Defaults to `3221`.                                                          |
-| `CONVEX_PORT`                   | no                      | Local Convex backend port. Defaults to `3220`.                                         |
-| `CONVEX_SITE_PROXY_PORT`        | no                      | Local Convex site proxy port. Defaults to `3222`.                                      |
-| `CONVEX_DASHBOARD_PORT`         | no                      | Local Convex dashboard port. Defaults to `6792`.                                       |
+| Variable                       | Description                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------- |
+| `CONVEX_INSTANCE_SECRET`       | Secret the Convex container requires on first boot.                                      |
+| `CONVEX_SELF_HOSTED_ADMIN_KEY` | Admin key printed by the Convex backend; used by `pnpm convex:deploy`.                   |
+| `CONVEX_SELF_HOSTED_URL`       | Server-side Convex URL — `http://127.0.0.1:3220` for host dev.                           |
+| `CLOUDFLARE_TUNNEL_TOKEN`      | Token for the mandatory `cloudflared` container.                                        |
+| `CLOUDFLARE_TUNNEL_URL`        | Public tunnel origin. shim throws at startup if unset; used for setup, CORS, dev host.   |
+| `ALLOWED_IPS`                  | CF-Connecting-IP allow-list for the proxy (Cursor's BYOK egress IPs).                    |
+
+`SHIM_MAX_UPSTREAM_CONCURRENCY` (default `3`) and `LOG_LEVEL` (default `INFO`) are
+undocumented code-only tuning knobs — set them in the environment only if needed.
 
 ## Scripts
 
@@ -127,31 +124,29 @@ The `.env.example` file is the source of truth for local configuration.
 ## Docker profiles
 
 ```bash
-docker compose up -d convex convex-dashboard
-docker compose --profile tunnel up -d cloudflared
+docker compose up -d
 docker compose --profile prod up -d app
 ```
 
-- **Default services** — run local Convex and the Convex dashboard.
-- **`tunnel` profile** — runs Cloudflare Tunnel and requires `CLOUDFLARE_TUNNEL_TOKEN`.
+- **Default services** — local Convex, the Convex dashboard, and the Cloudflare
+  tunnel (`cloudflared`). The tunnel is mandatory and requires `CLOUDFLARE_TUNNEL_TOKEN`.
 - **`prod` profile** — builds and runs the app container behind the same local ports.
 
 ## API surface
+
+HTTP endpoints — the public-facing surface, exposed through the tunnel:
 
 | Endpoint                        | Purpose                                                  |
 | ------------------------------- | -------------------------------------------------------- |
 | `POST /v1/chat/completions`     | OpenAI-compatible chat completion proxy for Cursor BYOK. |
 | `POST /api/v1/chat/completions` | API-prefixed mirror of the chat completion proxy.        |
 | `GET /v1/models`                | OpenAI-style model list including the `codex` sentinel.  |
-| `GET /api/health`               | Health check endpoint.                                   |
-| `GET /api/settings`             | Read dashboard model, reasoning, and tunnel settings.    |
-| `POST /api/settings`            | Update dashboard model, reasoning, and tunnel settings.  |
-| `GET /api/usage`                | Read the latest plan usage snapshot.                     |
-| `POST /api/usage`               | Trigger a manual plan usage refresh.                     |
-| `GET /api/auth/login`           | Start the Codex OAuth flow.                              |
-| `GET /api/auth/callback`        | Complete the Codex OAuth callback.                       |
-| `GET /api/auth/status`          | Check whether a Codex session is available.              |
-| `GET /api/auth/logout`          | Clear the stored Codex OAuth session.                    |
+| `GET /api/health`               | Health check endpoint (used by the Docker healthcheck).  |
+
+The dashboard talks to the server through **TanStack Start server functions** (typed
+RPC, validated with Zod), not REST routes — see `src/lib/api/server-fns.ts`: settings
+read/write, plan-usage read/refresh, analytics, the connection test, and the Codex
+OAuth flow (`initLogin`, `exchangeCallback`, `getAuthStatus`, `logout`).
 
 ## Project structure
 
@@ -161,6 +156,7 @@ public/                 Manifest and app logos
 src/components/         React UI components
 src/components/ui/      Reusable shadcn-style primitives
 src/lib/                Shared client utilities
+src/lib/api/            TanStack Start server functions, Zod schemas, query/mutation hooks
 src/lib/server/         Server handlers, OAuth, translation, settings, and middleware
 src/routes/             TanStack Router pages and API routes
 vite.config.ts          Vite+ app, test, lint, format, and staged config
@@ -185,7 +181,7 @@ Set `CONVEX_INSTANCE_SECRET` in `.env` before the first `docker compose up -d co
 <details>
 <summary>Proxy requests return 403</summary>
 
-Check the server logs for a blocked IP message and update `ALLOWED_IPS` with Cursor's egress IP if appropriate. Use `ALLOWED_IPS=disabled` only for local development.
+Check the server logs. `[SECURITY] Blocked IP: <ip>` means the IP isn't in `ALLOWED_IPS` — add Cursor's egress IP if appropriate. `[SECURITY] Blocked request: no CF-Connecting-IP` means the request didn't come through the Cloudflare tunnel; the proxy is tunnel-only and there is no bypass.
 
 </details>
 

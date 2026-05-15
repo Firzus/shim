@@ -1,93 +1,35 @@
 import { memo, useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Loader2, RefreshCw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useRefreshUsage } from '@/lib/api/mutations'
+import { usageQuery } from '@/lib/api/queries'
+import type { RateLimitWindow } from '@/lib/api/types'
+import { m } from '@/paraglide/messages'
 import { cn } from '@/lib/utils'
 
-interface RateLimitWindow {
-  limit_window_seconds: number
-  reset_after_seconds: number
-  reset_at: number
-  used_percent: number
-}
-
-interface RateLimit {
-  allowed: boolean
-  limit_reached: boolean
-  primary_window: RateLimitWindow | null
-  secondary_window: RateLimitWindow | null
-}
-
-interface UsageRaw {
-  plan_type?: string | null
-  rate_limit?: RateLimit | null
-}
-
-interface UsageSnapshot {
-  capturedAt: number | null
-  raw: UsageRaw | null
-  stalenessMs: number | null
-}
-
-interface UsageState extends UsageSnapshot {
-  receivedAt: number
-}
-
 export function PlanUsageHero() {
-  const [usage, setUsage] = useState<UsageState | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
-  const [loaded, setLoaded] = useState(false)
-
   // No `now` ticker at this level on purpose: each live-tick UI piece
   // (CapturedAgo, ResetCountdown) owns its own 1s setInterval so the parent
   // and the memoized UsageRing/UsageBar don't re-render every second.
-
-  useEffect(() => {
-    let alive = true
-    const tick = async () => {
-      try {
-        const res = await fetch('/api/usage')
-        if (res.ok && alive) {
-          const nextUsage = (await res.json()) as UsageSnapshot
-          setUsage({ ...nextUsage, receivedAt: Date.now() })
-        }
-      } catch {
-        // silent
-      } finally {
-        if (alive) setLoaded(true)
-      }
-    }
-    void tick()
-    const id = setInterval(() => void tick(), 60_000)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
-  }, [])
-
-  async function force(): Promise<void> {
-    setRefreshing(true)
-    try {
-      const res = await fetch('/api/usage', { method: 'POST' })
-      if (res.ok) {
-        const nextUsage = (await res.json()) as UsageSnapshot
-        setUsage({ ...nextUsage, receivedAt: Date.now() })
-      }
-    } catch {
-      // silent
-    } finally {
-      setRefreshing(false)
-    }
-  }
+  const {
+    data: usage,
+    isPending,
+    dataUpdatedAt,
+  } = useQuery({ ...usageQuery(), refetchInterval: 60_000 })
+  // Manual refresh — the POST returns the fresh snapshot, written straight
+  // into the cache by useRefreshUsage (no follow-up GET).
+  const refresh = useRefreshUsage()
 
   const primary = usage?.raw?.rate_limit?.primary_window ?? null
   const secondary = usage?.raw?.rate_limit?.secondary_window ?? null
   const plan = usage?.raw?.plan_type
   const hasData = primary || secondary
 
-  if (!loaded) {
+  if (isPending) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
         <Skeleton className="h-7 w-40" />
@@ -108,7 +50,7 @@ export function PlanUsageHero() {
     <section className="rounded-xl border border-border bg-card p-6 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">Plan usage</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{m.usage_title()}</h2>
           {plan ? (
             <Badge variant="outline" className="font-mono text-[10px] uppercase">
               {plan}
@@ -118,34 +60,36 @@ export function PlanUsageHero() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => void force()}
-          disabled={refreshing}
-          aria-label="refresh usage"
+          onClick={() => refresh.mutate()}
+          disabled={refresh.isPending}
+          aria-label={m.usage_refresh_aria()}
         >
-          {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-          {refreshing ? 'Refreshing…' : 'Refresh'}
+          {refresh.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          {refresh.isPending ? m.usage_refreshing() : m.usage_refresh()}
         </Button>
       </div>
 
       {!hasData ? (
-        <p className="mt-6 text-sm text-muted-foreground">
-          No snapshot yet — the poller refreshes every 5 minutes after you sign in.
-        </p>
+        <p className="mt-6 text-sm text-muted-foreground">{m.usage_no_snapshot()}</p>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr] lg:items-center">
-          {primary ? <UsageRing label="5h window" window={primary} /> : <div />}
+          {primary ? <UsageRing label={m.usage_window_5h()} window={primary} /> : <div />}
           <div className="space-y-5">
-            {primary ? <UsageBar label="5-hour reset" window={primary} /> : null}
-            {secondary ? <UsageBar label="Weekly window" window={secondary} /> : null}
+            {primary ? <UsageBar label={m.usage_reset_5h()} window={primary} /> : null}
+            {secondary ? <UsageBar label={m.usage_window_weekly()} window={secondary} /> : null}
             {!primary && !secondary ? (
-              <p className="text-sm text-muted-foreground">No active rate-limit window.</p>
+              <p className="text-sm text-muted-foreground">{m.usage_no_window()}</p>
             ) : null}
           </div>
         </div>
       )}
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Captured {usage ? <CapturedAgo usage={usage} /> : 'just now'} ago.
+        {usage ? (
+          <CapturedAgo stalenessMs={usage.stalenessMs} dataUpdatedAt={dataUpdatedAt} />
+        ) : (
+          m.usage_captured({ ago: m.usage_just_now() })
+        )}
       </p>
     </section>
   )
@@ -195,7 +139,7 @@ const UsageRing = memo(function UsageRing({
         <span className="font-mono text-4xl font-semibold tabular-nums">{formatPct(pct)}</span>
         <span className="mt-1 text-xs text-muted-foreground">{label}</span>
         <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          resets in <ResetCountdown resetAt={w.reset_at} />
+          <ResetCountdown resetAt={w.reset_at} />
         </span>
       </div>
     </div>
@@ -217,7 +161,7 @@ const UsageBar = memo(function UsageBar({
       <div className="flex items-baseline justify-between text-sm">
         <span className="font-medium">{label}</span>
         <span className="font-mono text-xs text-muted-foreground">
-          {formatPct(pct)} · resets in <ResetCountdown resetAt={w.reset_at} />
+          {formatPct(pct)} · <ResetCountdown resetAt={w.reset_at} />
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08] shadow-inner shadow-background/30">
@@ -234,12 +178,21 @@ const UsageBar = memo(function UsageBar({
 // PlanUsageHero never re-renders from this tick.
 function ResetCountdown({ resetAt }: { resetAt: number }) {
   const now = useNow()
-  return <>{formatDuration(Math.max(0, Math.floor(resetAt - now / 1000)))}</>
+  const duration = formatDuration(Math.max(0, Math.floor(resetAt - now / 1000)))
+  return <>{m.usage_resets_in({ duration })}</>
 }
 
-function CapturedAgo({ usage }: { usage: UsageState }) {
+function CapturedAgo({
+  stalenessMs,
+  dataUpdatedAt,
+}: {
+  stalenessMs: number | null
+  dataUpdatedAt: number
+}) {
   const now = useNow()
-  return <>{formatAgo(getStalenessMs(usage, now))}</>
+  return (
+    <>{m.usage_captured({ ago: formatAgo(getStalenessMs(stalenessMs, dataUpdatedAt, now)) })}</>
+  )
 }
 
 function useNow(): number {
@@ -263,10 +216,10 @@ function formatPct(pct: number): string {
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
-  const m = Math.floor(seconds / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  const rm = m % 60
+  const mins = Math.floor(seconds / 60)
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const rm = mins % 60
   if (h < 24) return rm > 0 ? `${h}h ${rm}m` : `${h}h`
   const d = Math.floor(h / 24)
   const rh = h % 24
@@ -274,14 +227,21 @@ function formatDuration(seconds: number): string {
 }
 
 function formatAgo(ms: number | null): string {
-  if (ms === null || ms < 0) return 'just now'
+  if (ms === null || ms < 0) return m.usage_just_now()
   if (ms < 60_000) return `${Math.round(ms / 1_000)}s`
-  const m = Math.round(ms / 60_000)
-  if (m < 60) return `${m}m`
-  return `${Math.round(m / 60)}h`
+  const mins = Math.round(ms / 60_000)
+  if (mins < 60) return `${mins}m`
+  return `${Math.round(mins / 60)}h`
 }
 
-function getStalenessMs(usage: UsageState, now: number): number | null {
-  if (usage.stalenessMs === null) return null
-  return usage.stalenessMs + Math.max(0, now - usage.receivedAt)
+// Project the server-reported staleness forward by the time elapsed since the
+// query last resolved (dataUpdatedAt is TanStack Query's equivalent of the old
+// client-side `receivedAt`).
+function getStalenessMs(
+  stalenessMs: number | null,
+  dataUpdatedAt: number,
+  now: number,
+): number | null {
+  if (stalenessMs === null) return null
+  return stalenessMs + Math.max(0, now - dataUpdatedAt)
 }

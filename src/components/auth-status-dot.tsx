@@ -1,15 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { authStatusQuery } from '@/lib/api/queries'
+import type { AuthStatus } from '@/lib/api/types'
+import { m } from '@/paraglide/messages'
 import { formatRelativeExpiry } from '@/lib/format-relative-expiry'
 import { cn } from '@/lib/utils'
-
-export interface AuthStatus {
-  authenticated: boolean
-  expiresAt: number | null
-  accountId: string | null
-  planType: string | null
-}
 
 type Tone = 'ok' | 'warn' | 'down' | 'idle'
 
@@ -21,34 +17,14 @@ function toneFor(status: AuthStatus | null): Tone {
 }
 
 function labelFor(tone: Tone, status: AuthStatus | null): string {
-  if (tone === 'idle') return 'checking…'
-  if (tone === 'down') return 'disconnected — sign in with Codex'
-  if (tone === 'warn')
-    return `token expires in ${formatRelativeExpiry(status?.expiresAt)} — re-auth soon`
-  return `connected${status?.planType ? ` · ${status.planType}` : ''}`
+  if (tone === 'idle') return m.auth_checking()
+  if (tone === 'down') return m.auth_disconnected()
+  if (tone === 'warn') return m.auth_expiring({ expiry: formatRelativeExpiry(status?.expiresAt) })
+  return `${m.auth_connected()}${status?.planType ? ` · ${status.planType}` : ''}`
 }
 export function AuthStatusDot() {
-  const [status, setStatus] = useState<AuthStatus | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/auth/status')
-        if (!res.ok) return
-        const data = (await res.json()) as AuthStatus
-        if (alive) setStatus(data)
-      } catch {
-        // silent
-      }
-    }
-    void poll()
-    const id = setInterval(() => void poll(), 5_000)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
-  }, [])
+  const { data } = useQuery({ ...authStatusQuery(), refetchInterval: 5_000 })
+  const status = data ?? null
 
   const tone = toneFor(status)
   const dotColor =

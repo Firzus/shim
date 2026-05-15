@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router'
 
 import { Button } from '@/components/ui/button'
+import { m } from '@/paraglide/messages'
 
 export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter()
@@ -21,7 +22,7 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-start gap-4 px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">something went wrong</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{m.error_something_wrong()}</h1>
       <ErrorComponent error={error} />
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -31,11 +32,11 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
           variant="default"
           size="sm"
         >
-          try again
+          {m.error_try_again()}
         </Button>
         {isRoot ? (
           <Button render={<Link to="/" />} variant="outline" size="sm">
-            home
+            {m.error_home()}
           </Button>
         ) : (
           <Button
@@ -51,7 +52,7 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
             variant="outline"
             size="sm"
           >
-            go back
+            {m.error_go_back()}
           </Button>
         )}
       </div>

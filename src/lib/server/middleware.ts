@@ -4,24 +4,24 @@ import { logger } from './logger'
 const config = getConfig()
 
 /**
- * Check if the request IP is in the whitelist.
- * Requests come through the Cloudflare tunnel; the client IP is extracted
- * from CF-Connecting-IP or X-Forwarded-For.
+ * Check if the request reached us legitimately through the Cloudflare tunnel.
+ *
+ * The proxy is tunnel-only by design: Cloudflare always sets `CF-Connecting-IP`,
+ * so its absence means the request bypassed the tunnel (hit the origin port
+ * directly) and is rejected. `X-Forwarded-For` is intentionally NOT trusted —
+ * it is trivially forgeable by anything that can reach the origin. When the
+ * header is present, the client IP must still be on the `ALLOWED_IPS` list.
  */
 export function checkIPWhitelist(req: Request): {
   allowed: boolean
   ip?: string
   reason?: string
 } {
-  if (config.allowedIPs.length === 0) {
-    return { allowed: true, ip: 'all' }
-  }
-
-  const cfConnectingIp = req.headers.get('cf-connecting-ip')
-  const clientIP = cfConnectingIp ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  const clientIP = req.headers.get('cf-connecting-ip')?.trim()
 
   if (!clientIP) {
-    return { allowed: false, reason: 'No IP found in headers' }
+    logger.warn('[SECURITY] Blocked request: no CF-Connecting-IP (not via Cloudflare tunnel)')
+    return { allowed: false, reason: 'Request did not arrive through the Cloudflare tunnel' }
   }
 
   const isAllowed = config.allowedIPs.includes(clientIP)

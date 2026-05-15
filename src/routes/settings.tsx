@@ -1,130 +1,99 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { Loader2, LogOut } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-import type { AuthStatus } from '@/components/auth-status-dot'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { useLogout, useSaveSettings } from '@/lib/api/mutations'
+import { authStatusQuery, settingsQuery } from '@/lib/api/queries'
+import { m } from '@/paraglide/messages'
 import { formatRelativeExpiry } from '@/lib/format-relative-expiry'
 import { formatEffort, formatModel } from '@/lib/labels'
-import { cn } from '@/lib/utils'
+import { cn, errorMessage } from '@/lib/utils'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
 
-interface Settings {
-  model: string
-  reasoningEffort: string
-  updatedAt: number | null
-  allowed: { models: string[]; efforts: string[] }
-}
-
 function SettingsPage() {
-  const [settings, setSettings] = useState<Settings | null>(null)
-  const [status, setStatus] = useState<AuthStatus | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { data: settings } = useQuery(settingsQuery())
+  const { data: status } = useQuery(authStatusQuery())
+  // useSaveSettings handles the optimistic cache update + rollback; the cache
+  // is shared, so the status strip / onboarding reflect the change too.
+  const saveSettings = useSaveSettings()
+  const logout = useLogout()
 
-  useEffect(() => {
-    void refresh()
-  }, [])
-
-  async function refresh(): Promise<void> {
-    try {
-      const [s, a] = await Promise.all([
-        fetch('/api/settings').then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/auth/status').then((r) => (r.ok ? r.json() : null)),
-      ])
-      if (s) setSettings(s as Settings)
-      if (a) setStatus(a as AuthStatus)
-    } catch {
-      return
-    }
-  }
-
-  async function save(field: 'model' | 'reasoningEffort', value: string): Promise<void> {
-    if (!settings) return
-    const prev = settings
-    setSettings({ ...settings, [field]: value })
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value }),
-      })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'save failed')
-      await refresh()
-      toast.success(`${field === 'model' ? 'Model' : 'Reasoning'} updated`)
-    } catch (error) {
-      setSettings(prev)
-      toast.error(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function logout(): Promise<void> {
-    setBusy(true)
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      await refresh()
-      toast.success('Logged out')
-    } finally {
-      setBusy(false)
-    }
+  function save(field: 'model' | 'reasoningEffort', value: string): void {
+    saveSettings.mutate(
+      { [field]: value },
+      {
+        onSuccess: () =>
+          toast.success(field === 'model' ? m.toast_model_updated() : m.toast_reasoning_updated()),
+        onError: (error) => toast.error(errorMessage(error)),
+      },
+    )
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-10 px-4 py-10 sm:px-6 sm:py-12">
       <header className="space-y-2">
         <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          settings
+          {m.settings_eyebrow()}
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{m.settings_title()}</h1>
       </header>
 
       <Section
-        title="Model & reasoning"
-        description="shim overrides whatever Cursor sends with these values. Type `codex` as the model name in Cursor and your choice here wins."
+        title={m.settings_model_section_title()}
+        description={m.settings_model_section_desc()}
       >
         <PickRow
-          label="Model"
+          label={m.settings_model_label()}
           value={settings?.model ?? ''}
           options={settings?.allowed.models ?? []}
           formatLabel={formatModel}
-          onPick={(v) => void save('model', v)}
+          onPick={(v) => save('model', v)}
         />
         <PickRow
-          label="Reasoning effort"
+          label={m.settings_effort_label()}
           value={settings?.reasoningEffort ?? ''}
           options={settings?.allowed.efforts ?? []}
           formatLabel={formatEffort}
-          onPick={(v) => void save('reasoningEffort', v)}
+          onPick={(v) => save('reasoningEffort', v)}
         />
       </Section>
 
       <Separator />
 
-      <Section title="Account" description="ChatGPT OAuth session used by the proxy.">
+      <Section title={m.settings_account_title()} description={m.settings_account_desc()}>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[140px_1fr]">
-          <dt className="text-muted-foreground">Status</dt>
+          <dt className="text-muted-foreground">{m.settings_status()}</dt>
           <dd
             className={cn(
               'font-medium',
               status?.authenticated ? 'text-success' : 'text-destructive',
             )}
           >
-            {status?.authenticated ? 'connected' : 'disconnected'}
+            {status?.authenticated ? m.state_connected() : m.state_disconnected()}
           </dd>
-          <dt className="text-muted-foreground">Account ID</dt>
+          <dt className="text-muted-foreground">{m.settings_account_id()}</dt>
           <dd className="font-mono break-all">{status?.accountId ?? '—'}</dd>
-          <dt className="text-muted-foreground">Plan</dt>
+          <dt className="text-muted-foreground">{m.settings_plan()}</dt>
           <dd className="font-mono">{status?.planType ?? '—'}</dd>
-          <dt className="text-muted-foreground">Token expires in</dt>
+          <dt className="text-muted-foreground">{m.settings_token_expires()}</dt>
           <dd className="font-mono">{formatRelativeExpiry(status?.expiresAt)}</dd>
         </dl>
 
         <div className="pt-2">
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => void logout()}>
-            {busy ? <Loader2 className="animate-spin" /> : <LogOut />}
-            Sign out
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={logout.isPending}
+            onClick={() =>
+              logout.mutate(undefined, { onSuccess: () => toast.success(m.toast_logged_out()) })
+            }
+          >
+            {logout.isPending ? <Loader2 className="animate-spin" /> : <LogOut />}
+            {m.settings_sign_out()}
           </Button>
         </div>
       </Section>
@@ -170,7 +139,7 @@ function PickRow({
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {options.length === 0 ? (
-          <span className="text-sm text-muted-foreground">loading…</span>
+          <span className="text-sm text-muted-foreground">{m.settings_loading()}</span>
         ) : (
           options.map((opt) => {
             const active = opt === value
