@@ -13,12 +13,15 @@
     "check": "vp check",
     "fmt": "vp fmt",
     "test": "vp test run",
+    "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
+    "postinstall": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
     "prepare": "node -e \"require('node:fs').existsSync('.git') && require('node:child_process').execSync('vp config', { stdio: 'inherit' })\"",
     "convex:deploy": "vpx convex dev --once"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-query": "^5.100.10",
     "@tanstack/react-router": "^1.169.2",
     "@tanstack/react-router-ssr-query": "^1.166.12",
     "@tanstack/react-start": "^1.167.65",
@@ -37,9 +40,11 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@inlang/paraglide-js": "^2.18.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "^0.7.0",
     "@tanstack/react-devtools": "^0.10.5",
+    "@tanstack/react-query-devtools": "^5.100.10",
     "@tanstack/react-router-devtools": "^1.166.13",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.0",

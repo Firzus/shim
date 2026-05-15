@@ -2,6 +2,7 @@ import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { m } from '@/paraglide/messages'
 import { CURSOR_SENTINEL_MODEL } from '@/lib/cursor-byok'
 import { cn } from '@/lib/utils'
 
@@ -16,24 +17,28 @@ export function CursorByokInstructions({ tunnelUrl }: CursorByokInstructionsProp
     <>
       <ol className="space-y-3 text-sm">
         <SetupStep n={1}>
-          Open <em className="not-italic font-mono text-foreground">Cursor → Settings → Models</em>.
+          {m.byok_step1_lead()}
+          <em className="not-italic font-mono text-foreground">Cursor → Settings → Models</em>
+          {m.byok_step1_tail()}
         </SetupStep>
         <SetupStep n={2}>
-          Click <em className="not-italic font-mono text-foreground">+ Add Custom Model</em> and
-          paste the values below.
+          {m.byok_step2_lead()}
+          <em className="not-italic font-mono text-foreground">+ Add Custom Model</em>
+          {m.byok_step2_tail()}
         </SetupStep>
         <SetupStep n={3}>
-          Paste <em className="not-italic font-mono text-foreground">any non-empty string</em> as
-          the API key — shim uses your ChatGPT session, not the key.
+          {m.byok_step3_lead()}
+          <em className="not-italic font-mono text-foreground">{m.byok_step3_em()}</em>
+          {m.byok_step3_tail()}
         </SetupStep>
       </ol>
 
       <div className="grid grid-cols-1 gap-3 pt-2">
-        <CopyField label="Base URL" value={baseUrl} disabled={!baseUrl} />
+        <CopyField label={m.byok_base_url()} value={baseUrl} disabled={!baseUrl} />
         <CopyField
-          label="Model name"
+          label={m.byok_model_name()}
           value={CURSOR_SENTINEL_MODEL}
-          hint="shim swaps this for your chosen Codex model"
+          hint={m.byok_model_hint()}
         />
       </div>
     </>
@@ -90,18 +95,18 @@ function CopyField({
             disabled ? 'text-muted-foreground/40' : 'text-foreground',
           )}
         >
-          {value || '— set the tunnel URL first —'}
+          {value || m.byok_set_tunnel_first()}
         </code>
         <Button
           variant="outline"
           size="sm"
           onClick={() => void copy()}
-          aria-label={`Copy ${label}`}
+          aria-label={m.byok_copy_aria({ label })}
           disabled={disabled}
           className={cn('shrink-0', copied && 'border-success/40 text-success')}
         >
           {copied ? <Check /> : <Copy />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? m.byok_copied() : m.byok_copy()}
         </Button>
       </div>
     </div>

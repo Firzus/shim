@@ -20,8 +20,7 @@ pnpm test  # (unverified)
 pnpm exec vp --version
 pnpm exec tsc --version
 pnpm convex:deploy  # (unverified; package script runs `vpx convex dev --once`, not production deploy)
-docker compose up -d convex convex-dashboard  # (unverified; local Convex services)
-docker compose --profile tunnel up -d cloudflared  # (unverified; requires CLOUDFLARE_TUNNEL_TOKEN)
+docker compose up -d  # (unverified; convex, convex-dashboard + mandatory cloudflared tunnel)
 docker compose --profile prod up -d app  # (unverified; production-like local container profile)
 ```
 

@@ -1,4 +1,10 @@
-import { HeadContent, Scripts, createRootRoute, useRouterState } from '@tanstack/react-router'
+import {
+  HeadContent,
+  Scripts,
+  createRootRouteWithContext,
+  useRouterState,
+} from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { Suspense, lazy } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
@@ -7,6 +13,7 @@ import { DefaultCatchBoundary } from '@/components/default-catch-boundary'
 import { NotFound } from '@/components/not-found'
 import { SiteFooter } from '@/components/site-footer'
 import { SiteHeader } from '@/components/site-header'
+import { getLocale } from '@/paraglide/runtime'
 import appCss from '../styles.css?url'
 
 // Devtools are dev-only. import.meta.env.DEV is a static boolean — Vite's
@@ -14,22 +21,27 @@ import appCss from '../styles.css?url'
 // of the prod bundle entirely.
 const Devtools = import.meta.env.DEV
   ? lazy(async () => {
-      const [{ TanStackDevtools }, { TanStackRouterDevtoolsPanel }] = await Promise.all([
-        import('@tanstack/react-devtools'),
-        import('@tanstack/react-router-devtools'),
-      ])
+      const [{ TanStackDevtools }, { TanStackRouterDevtoolsPanel }, { ReactQueryDevtoolsPanel }] =
+        await Promise.all([
+          import('@tanstack/react-devtools'),
+          import('@tanstack/react-router-devtools'),
+          import('@tanstack/react-query-devtools'),
+        ])
       return {
         default: () => (
           <TanStackDevtools
             config={{ position: 'bottom-right' }}
-            plugins={[{ name: 'Tanstack Router', render: <TanStackRouterDevtoolsPanel /> }]}
+            plugins={[
+              { name: 'Tanstack Router', render: <TanStackRouterDevtoolsPanel /> },
+              { name: 'React Query', render: <ReactQueryDevtoolsPanel /> },
+            ]}
           />
         ),
       }
     })
   : () => null
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -66,7 +78,7 @@ function AppShell({ children }: { children: ReactNode }) {
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang={getLocale()} className="dark">
       <head>
         <HeadContent />
       </head>

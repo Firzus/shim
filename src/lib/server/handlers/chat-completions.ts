@@ -8,7 +8,6 @@ import { corsHeaders, ipWhitelistGuard, logRequestDetails } from '../middleware'
 // is enough to keep the snapshot fresh (no need for the dashboard to be open).
 import '../plan-usage-poller'
 import { getShimSettings } from '../settings'
-import { COMPACT_INSTRUCTIONS, detectCompactSentinel } from '../translation/compact-detect'
 import { buildCodexFromResponsesBody } from '../translation/responses-passthrough'
 import {
   applyEventToBuffer,
@@ -28,7 +27,7 @@ function openaiErrorBody(
 interface RecordRequestArgs {
   timestamp: number
   model: string
-  source: 'cursor' | 'error' | 'compact'
+  source: 'cursor' | 'error'
   stream: boolean
   inputTokens?: number | null
   outputTokens?: number | null
@@ -78,19 +77,8 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   // so we forward verbatim.
   const passthrough = buildCodexFromResponsesBody(rawBody)
   const body = passthrough.body
-
-  // /compact sentinel → summarization mode on a fresh cache lane.
-  const compact = detectCompactSentinel(passthrough.body.input as Array<Record<string, unknown>>)
-  const promptCacheKey = compact.matched ? crypto.randomUUID() : passthrough.promptCacheKey
-  if (compact.matched) {
-    body.input = compact.strippedInput
-    body.instructions = COMPACT_INSTRUCTIONS
-    body.prompt_cache_key = promptCacheKey
-    delete body.tools
-    delete body.tool_choice
-    delete body.parallel_tool_calls
-  }
-  const source: 'cursor' | 'compact' = compact.matched ? 'compact' : 'cursor'
+  const promptCacheKey = passthrough.promptCacheKey
+  const source = 'cursor' as const
 
   // Codex routes by Session_id / Conversation_id headers (not just the body's
   // prompt_cache_key). Reusing the derived stable key across all three pins
@@ -104,14 +92,14 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   let appliedModel = passthrough.modelMapping.applied
   const reqModel = typeof rawBody.model === 'string' ? rawBody.model : ''
   logger.debug(
-    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen} cacheKey=${promptCacheKey} mode=${source}`,
+    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen} cacheKey=${promptCacheKey}`,
   )
 
-  // Dashboard settings own model + effort. /compact caps effort at 'medium'.
+  // Dashboard settings own model + effort.
   const settings = await getShimSettings()
   body.model = settings.model
   const existingReasoning = (body.reasoning as Record<string, unknown> | undefined) ?? {}
-  const effort = compact.matched ? 'medium' : settings.reasoningEffort
+  const effort = settings.reasoningEffort
   body.reasoning = {
     ...existingReasoning,
     effort,

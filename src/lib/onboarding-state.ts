@@ -1,18 +1,11 @@
 // Derived onboarding-completion state. There's no schema flag; step inference
 // is used to deep-link `/onboarding`.
 
-export type OnboardingStep = 'welcome' | 'model' | 'tunnel' | 'cursor' | 'skill' | 'test'
+import type { Analytics, AuthStatus, Settings } from '@/lib/api/types'
 
-export const STEPS: OnboardingStep[] = ['welcome', 'model', 'tunnel', 'cursor', 'skill', 'test']
+export type OnboardingStep = 'welcome' | 'model' | 'tunnel' | 'cursor' | 'test'
 
-export const STEP_LABEL: Record<OnboardingStep, string> = {
-  welcome: 'Connect ChatGPT',
-  model: 'Pick a model',
-  tunnel: 'Expose publicly',
-  cursor: 'Configure Cursor',
-  skill: 'Install compact-shim',
-  test: 'Test the connection',
-}
+export const STEPS: OnboardingStep[] = ['welcome', 'model', 'tunnel', 'cursor', 'test']
 
 export interface OnboardingProbe {
   authenticated: boolean
@@ -21,17 +14,19 @@ export interface OnboardingProbe {
   cursorRequests: number
 }
 
-export async function probeOnboarding(): Promise<OnboardingProbe> {
-  const [auth, settings, analytics] = await Promise.all([
-    fetch('/api/auth/status').then((r) => (r.ok ? r.json() : null)),
-    fetch('/api/settings').then((r) => (r.ok ? r.json() : null)),
-    fetch('/api/analytics?sinceHours=24').then((r) => (r.ok ? r.json() : null)),
-  ])
+// Build the probe from already-fetched query data. Callers feed the shared
+// TanStack Query results (auth-status / settings / analytics) so no extra
+// network round-trip is needed.
+export function deriveProbe(
+  auth: AuthStatus,
+  settings: Settings,
+  analytics: Analytics,
+): OnboardingProbe {
   return {
-    authenticated: Boolean(auth?.authenticated),
-    hasSettings: Boolean(settings?.updatedAt),
-    hasTunnelUrl: Boolean(settings?.tunnelUrl),
-    cursorRequests: typeof analytics?.cursorRequests === 'number' ? analytics.cursorRequests : 0,
+    authenticated: auth.authenticated,
+    hasSettings: Boolean(settings.updatedAt),
+    hasTunnelUrl: Boolean(settings.tunnelUrl),
+    cursorRequests: analytics.cursorRequests,
   }
 }
 
