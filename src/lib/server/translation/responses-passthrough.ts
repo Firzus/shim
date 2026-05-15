@@ -1,3 +1,4 @@
+import { deriveCacheKey } from './cache-key'
 import { mapToCodexModel, type ModelMappingResult } from './model-map'
 
 // Cursor BYOK sends a Responses-API-shaped body at /v1/chat/completions when
@@ -17,9 +18,10 @@ export interface PassthroughResult {
   modelMapping: ModelMappingResult
   systemPromptLen: number
   inputItemCount: number
+  promptCacheKey: string
 }
 
-interface InputItem {
+type InputItem = Record<string, unknown> & {
   type?: string
   role?: string
   content?: unknown
@@ -81,11 +83,9 @@ export function chatMessagesToInputItems(messages: unknown[]): InputItem[] {
           : extractTextFromContent(m.content) || JSON.stringify(m.content ?? '')
       items.push({
         type: 'function_call_output',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        call_id: m.tool_call_id as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        output: out as any,
-      } as InputItem)
+        call_id: m.tool_call_id,
+        output: out,
+      })
       continue
     }
     if (role === 'assistant') {
@@ -96,13 +96,10 @@ export function chatMessagesToInputItems(messages: unknown[]): InputItem[] {
           const fn = (t.function ?? {}) as Record<string, unknown>
           items.push({
             type: 'function_call',
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            call_id: t.id as any,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            name: fn.name as any,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            arguments: fn.arguments as any,
-          } as InputItem)
+            call_id: t.id,
+            name: fn.name,
+            arguments: fn.arguments,
+          })
         }
         if (typeof m.content === 'string' && m.content.length > 0) {
           items.push({
@@ -174,10 +171,7 @@ function normalizeTools(rawTools: unknown): unknown[] | undefined {
   return out.length > 0 ? out : undefined
 }
 
-export function buildCodexFromResponsesBody(
-  rawBody: Record<string, unknown>,
-  sessionId: string,
-): PassthroughResult {
+export function buildCodexFromResponsesBody(rawBody: Record<string, unknown>): PassthroughResult {
   const requestedModel = typeof rawBody.model === 'string' ? rawBody.model : ''
   const modelMapping = mapToCodexModel(requestedModel)
 
@@ -207,6 +201,7 @@ export function buildCodexFromResponsesBody(
 
   const instructions = instructionsParts.join('\n\n').trim() || ' '
   const tools = normalizeTools(rawBody.tools)
+  const promptCacheKey = deriveCacheKey(instructions)
 
   const out: Record<string, unknown> = {
     model: modelMapping.applied,
@@ -214,7 +209,11 @@ export function buildCodexFromResponsesBody(
     input: passthroughInput,
     stream: true,
     store: false,
-    prompt_cache_key: sessionId,
+    // Codex's /backend-api/codex/responses endpoint rejects
+    // `prompt_cache_retention` with 400 (it's a public-Responses-API param
+    // only). We rely on Codex's default retention; routing is what we
+    // control via prompt_cache_key.
+    prompt_cache_key: promptCacheKey,
   }
   if (tools) out.tools = tools
   if (rawBody.tool_choice !== undefined) out.tool_choice = rawBody.tool_choice
@@ -232,5 +231,6 @@ export function buildCodexFromResponsesBody(
     modelMapping,
     systemPromptLen: instructions.length,
     inputItemCount: passthroughInput.length,
+    promptCacheKey,
   }
 }

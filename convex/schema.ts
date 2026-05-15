@@ -14,7 +14,7 @@ export default defineSchema({
   requests: defineTable({
     timestamp: v.number(),
     model: v.string(),
-    source: v.union(v.literal('cursor'), v.literal('error')),
+    source: v.union(v.literal('cursor'), v.literal('error'), v.literal('compact')),
     stream: v.boolean(),
 
     // OpenAI Responses usage. `total_tokens` mirrors the upstream summary;
@@ -85,6 +85,11 @@ export default defineSchema({
     key: v.literal('singleton'),
     model: v.optional(v.string()),
     reasoningEffort: v.optional(v.string()), // none|low|medium|high
+    // Public URL Cursor hits — Cursor BYOK refuses private networks
+    // ("Access to private networks is forbidden"), so this MUST be a public
+    // address (Cloudflare Tunnel domain or equivalent). Set by the onboarding
+    // wizard. Override at deploy time with `CLOUDFLARE_TUNNEL_URL`.
+    tunnelUrl: v.optional(v.string()),
     updatedAt: v.number(),
   }).index('by_key', ['key']),
 })

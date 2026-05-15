@@ -9,7 +9,7 @@ export const recordRequest = mutation({
   args: {
     timestamp: v.number(),
     model: v.string(),
-    source: v.union(v.literal('cursor'), v.literal('error')),
+    source: v.union(v.literal('cursor'), v.literal('error'), v.literal('compact')),
     stream: v.boolean(),
     inputTokens: v.optional(v.union(v.number(), v.null())),
     outputTokens: v.optional(v.union(v.number(), v.null())),
@@ -48,6 +48,7 @@ export const getAnalytics = query({
     let totalRequests = 0
     let cursorRequests = 0
     let errorRequests = 0
+    let compactRequests = 0
     let totalInputTokens = 0
     let totalOutputTokens = 0
     let totalCachedTokens = 0
@@ -56,6 +57,7 @@ export const getAnalytics = query({
       totalRequests++
       if (row.source === 'cursor') cursorRequests++
       else if (row.source === 'error') errorRequests++
+      else if (row.source === 'compact') compactRequests++
       totalInputTokens += row.inputTokens ?? 0
       totalOutputTokens += row.outputTokens ?? 0
       totalCachedTokens += row.cachedTokens ?? 0
@@ -65,6 +67,7 @@ export const getAnalytics = query({
       totalRequests,
       cursorRequests,
       errorRequests,
+      compactRequests,
       totalInputTokens,
       totalOutputTokens,
       totalCachedTokens,

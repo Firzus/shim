@@ -19,6 +19,7 @@ export const get = query({
     return {
       model: row.model ?? null,
       reasoningEffort: row.reasoningEffort ?? null,
+      tunnelUrl: row.tunnelUrl ?? null,
       updatedAt: row.updatedAt,
     }
   },
@@ -28,8 +29,20 @@ export const save = mutation({
   args: {
     model: v.optional(v.string()),
     reasoningEffort: v.optional(v.string()),
+    tunnelUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await upsertShimSettings(ctx, args)
+  },
+})
+
+export const clear = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query('shimSettings')
+      .withIndex('by_key', (q) => q.eq('key', SINGLETON_KEY))
+      .unique()
+    if (existing) await ctx.db.delete(existing._id)
   },
 })

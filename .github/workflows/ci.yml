@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# Newer pushes on the same ref cancel in-flight runs to save Actions minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint + typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # --no-fmt: lint + type-check only. Formatting is enforced by the
+      # local pre-commit hook (vite.config.ts#staged) on staged code files;
+      # CI doesn't gate on markdown formatting that doesn't affect runtime.
+      - run: pnpm exec vp check --no-fmt
+
+  test:
+    name: vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp test run

@@ -44,7 +44,7 @@ export async function upsertPlanUsageSnapshot(
 
 export async function upsertShimSettings(
   ctx: Ctx,
-  args: { model?: string; reasoningEffort?: string },
+  args: { model?: string; reasoningEffort?: string; tunnelUrl?: string },
 ): Promise<void> {
   const existing = await ctx.db
     .query('shimSettings')
