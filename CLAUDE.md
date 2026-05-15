@@ -96,7 +96,7 @@ Convex schema/codegen: after editing `convex/schema.ts` or any `convex/*.ts` fun
 
 - **Don't commit / push / deploy / run migrations / start tunnels** without explicit user approval (per `AGENTS.md`).
 - **Don't store request or response bodies in Convex.** The `requests` table is metadata-only by design.
-- **Don't edit `convex/_generated/**`, `dist/**`, `node_modules/**`, or `pnpm-lock.yaml` by hand.**
+- **Don't edit `convex/\_generated/**`, `dist/**`, `node_modules/**`, or `pnpm-lock.yaml` by hand.\*\*
 - **Don't add dependencies** without approval — prefer existing React/TanStack/Convex/Base UI/lucide/Tailwind/zod utilities.
 - **Don't rename route files casually** — TanStack Router file names are public paths.
 - Local debug logs (if you need them) go under `.cursor/`, never the repo root.
