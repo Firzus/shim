@@ -28,9 +28,10 @@ Single-test runs go through Vite+:
 ```bash
 pnpm exec vp test run path/to/file.test.ts
 pnpm exec vp test run -t "test name fragment"
+pnpm exec vp check --no-fmt                # same lint + type-aware checks CI runs
 ```
 
-Linting/formatting/staged config all live in `vite.config.ts` (`lint.options.typeAware: true`, `fmt.singleQuote: true`, `staged: { '*.{js,ts,tsx,jsx,css}': 'vp check --fix' }`). The `prepare` script wires `vp config` into git hooks.
+Linting/formatting/staged config all live in `vite.config.ts` (`lint.options.typeAware: true`, `fmt.singleQuote: true`, `staged: { '*.{js,ts,tsx,jsx,css}': 'vp check --fix' }`). The `prepare` script wires `vp config` into git hooks (no-op outside a git checkout).
 
 Local services (Convex backend + dashboard) run via Docker Compose:
 
@@ -51,9 +52,22 @@ Convex schema/codegen: after editing `convex/schema.ts` or any `convex/*.ts` fun
 3. The handler runs `ipWhitelistGuard` (allow-list from `ALLOWED_IPS`, can be `disabled` for local), parses the body, and feeds it to **the passthrough translator**, not a Chat-shape adapter.
 4. `buildCodexFromResponsesBody` (`src/lib/server/translation/responses-passthrough.ts`) preserves Cursor's Responses-API-shaped body verbatim — critically the `reasoning.encrypted_content` items that carry state between turns. It only fixes the fields Codex requires us to control (model allow-list, instructions split, `store=false`, `prompt_cache_key`, tools shape). The Chat-shape branch exists for fallback (Cursor sends Chat-shape when the model isn't on its reasoning-model heuristic list).
 5. `getShimSettings()` (`src/lib/server/settings.ts`) overrides `model` and `reasoning.effort` from the dashboard singleton. Cursor's `model: "codex"` is a sentinel — the dashboard is the single source of truth. The settings reader is cached with a 3s TTL.
-6. `postCodexResponses` (`src/lib/server/codex-client.ts`) attaches every mandatory upstream header (Bearer, `Chatgpt-Account-Id`, `Originator`, `Version`, `Session_id`, `Conversation_id`, custom UA). On a 401 it clears the process-local token cache and retries once.
+6. `postCodexResponses` (`src/lib/server/codex-client.ts`) attaches every mandatory upstream header (Bearer, `Chatgpt-Account-Id`, `Originator`, `Version`, `Session_id`, `Conversation_id`, custom UA). On a 401 it clears the process-local token cache and retries once. The handler derives both `sessionId` and `conversationId` from the body's `prompt_cache_key` so multi-turn Cursor traffic pins to the same upstream machine and unlocks real prompt-cache hits.
 7. The upstream SSE stream is translated to OpenAI `chat.completion.chunk` SSE in real time by `createOpenAIStreamFromCodex` (`src/lib/server/translation/stream-translator.ts`) using the line buffer in `sse-parser.ts` and the event-shape helpers in `types.ts`. Non-streaming requests are buffered through `responses-to-chat.ts` (`freshBuffer` → `applyEventToBuffer` → `bufferToCompletion`).
-8. After the stream completes, `recordRequestSafe` writes token counts, `prompt_cache_key`, latency, and tool counts into the Convex `requests` table. **Bodies are never persisted** — only metadata (see `convex/schema.ts`).
+8. After the stream completes, `recordRequestSafe` writes token counts, `prompt_cache_key`, latency, and tool counts into the Convex `requests` table with `source ∈ { 'cursor' | 'error' | 'compact' }`. Analytics failures are swallowed so they never break the proxy. **Bodies are never persisted** — only metadata (see `convex/schema.ts`).
+
+### `/compact` summarization mode
+
+`src/lib/server/translation/compact-detect.ts` looks for the sentinel `<<<SHIM_COMPACT_V1>>>` in the last user message. On match the chat handler:
+
+- strips the sentinel from the user content,
+- replaces `instructions` with `COMPACT_INSTRUCTIONS` (produces a Markdown hand-off artifact wrapped between fixed marker lines),
+- swaps `prompt_cache_key` for a fresh random UUID so the summary runs on its own cache lane,
+- deletes `tools` / `tool_choice` / `parallel_tool_calls`,
+- caps `reasoning.effort` at `medium`,
+- records the request with `source: 'compact'`.
+
+The sentinel is meant to be injected by a Cursor slash command (e.g. `.cursor/commands/compact.md`) — the protocol is owned here, the marker is versioned, and the detector ignores echoed history (only the *last* user message counts).
 
 ### OAuth flow
 
@@ -67,6 +81,12 @@ Convex schema/codegen: after editing `convex/schema.ts` or any `convex/*.ts` fun
 - `shimSettings` (Convex singleton, keyed `'singleton'`) holds `model`, `reasoningEffort`, and `tunnelUrl`. Dashboard mutates it through `/api/settings`; the proxy reads cached values on every request.
 - `planUsageSnapshot` (Convex singleton) is refreshed by `src/lib/server/plan-usage-poller.ts`. The poller is bootstrapped via a side-effect import inside the chat-completions handler — proxy traffic alone keeps it fresh, so the dashboard doesn't need to be open.
 - `counters` is a materialized-counter table to avoid `.collect().length` scans for request counts.
+
+### Auxiliary API routes
+
+- `/api/analytics` (`src/routes/api/analytics.ts`) — reads from `api.requests.getAnalytics` for the dashboard; takes `?sinceHours=N` (default 24).
+- `/api/test-connection` (`src/routes/api/test-connection.ts`) — synthetic upstream ping used by the onboarding wizard. Lives outside `/v1/*` on purpose so the Cursor-egress IP allow-list doesn't reject a browser loopback fetch.
+- `/api/usage` GET/POST, `/api/settings` GET/POST, `/api/health`, `/api/auth/{login,callback,status,logout}` round out the dashboard surface.
 
 ### UI
 
