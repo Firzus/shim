@@ -7,6 +7,9 @@ ENV CI=1
 RUN corepack enable
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# postinstall runs paraglide-js compile; needs inlang project + message catalogs
+COPY project.inlang ./project.inlang
+COPY messages ./messages
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
