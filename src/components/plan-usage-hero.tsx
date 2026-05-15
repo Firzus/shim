@@ -220,9 +220,9 @@ const UsageBar = memo(function UsageBar({
           {formatPct(pct)} · resets in <ResetCountdown resetAt={w.reset_at} />
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08] shadow-inner shadow-background/30">
         <div
-          className={cn('h-full transition-[width] duration-700 ease-out', bg)}
+          className={cn('h-full rounded-full transition-[width] duration-700 ease-out', bg)}
           style={{ width: `${pct}%` }}
         />
       </div>
