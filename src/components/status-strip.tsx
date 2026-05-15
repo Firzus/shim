@@ -24,21 +24,25 @@ export function StatusStrip() {
 
   useEffect(() => {
     let alive = true
+    let requestId = 0
     const tick = async () => {
+      const currentRequestId = ++requestId
       try {
         const [a, s, an] = await Promise.all([
-          fetch('/api/auth/status').then((r) => (r.ok ? r.json() : null)),
-          fetch('/api/settings').then((r) => (r.ok ? r.json() : null)),
-          fetch('/api/analytics?sinceHours=24').then((r) => (r.ok ? r.json() : null)),
+          fetch('/api/auth/status', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+          fetch('/api/settings', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+          fetch(`/api/analytics?sinceHours=24&t=${Date.now()}`, { cache: 'no-store' }).then((r) =>
+            r.ok ? r.json() : null,
+          ),
         ])
-        if (!alive) return
+        if (!alive || currentRequestId !== requestId) return
         setStatus(a as AuthStatus | null)
         setSettings(s as Settings | null)
         setAnalytics(an as Analytics | null)
       } catch {
         return
       } finally {
-        if (alive) setLoaded(true)
+        if (alive && currentRequestId === requestId) setLoaded(true)
       }
     }
     void tick()
