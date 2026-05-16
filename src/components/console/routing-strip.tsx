@@ -29,7 +29,7 @@ export function RoutingStrip({
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <section className="elevation flex flex-col gap-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:flex-row sm:items-center sm:justify-between sm:p-5">
       <div className="space-y-1">
         <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
           {m.routing_label()}

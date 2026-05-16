@@ -1,20 +1,37 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, RefreshCw } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
+import { gsap, useGSAP } from '@/lib/gsap'
 import { ActivityPanel } from '@/components/console/activity-panel'
 import { ProviderPanel } from '@/components/console/provider-panel'
 import { PROVIDER_ORDER, type ProviderId } from '@/components/console/provider-mark'
 import { RoutingStrip } from '@/components/console/routing-strip'
+import { SystemHeartbeat } from '@/components/console/system-heartbeat'
 import { Button } from '@/components/ui/button'
 import { useRefreshUsage } from '@/lib/api/mutations'
 import { analyticsQuery, authStatusQuery, settingsQuery, usageQuery } from '@/lib/api/queries'
 import { m } from '@/paraglide/messages'
-import { CURSOR_SENTINEL_MODEL } from '@/lib/cursor-byok'
 import { deriveProbe, isOnboarded } from '@/lib/onboarding-state'
 
-export const Route = createFileRoute('/')({ component: Console })
+export const Route = createFileRoute('/')({
+  component: Console,
+  // Prefetch the console's queries so SSR renders with data already in cache
+  // and the client hydrates from the same dehydrated state. Without this, SSR
+  // paints the pending (disconnected) UI while the client hydrates from
+  // streamed query data — a hydration mismatch in RoutingStrip / ProviderPanel.
+  // prefetchQuery swallows errors, so a Convex outage still degrades gracefully
+  // instead of crashing the route.
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(authStatusQuery()),
+      context.queryClient.prefetchQuery(settingsQuery()),
+      context.queryClient.prefetchQuery(analyticsQuery(24)),
+      context.queryClient.prefetchQuery(usageQuery()),
+    ])
+  },
+})
 
 function hostOf(url: string | null | undefined): string | null {
   if (!url) return null
@@ -36,6 +53,24 @@ function Console() {
   const analytics = useQuery(analyticsQuery(24))
   const usage = useQuery({ ...usageQuery(), refetchInterval: 60_000 })
   const refreshUsage = useRefreshUsage()
+
+  // One-shot staggered reveal on mount. The hidden start state lives in CSS
+  // (`.console-anim [data-anim]`) so the SSR'd markup never flashes; under
+  // reduced motion the timeline is skipped and that CSS rule is overridden.
+  const containerRef = useRef<HTMLDivElement>(null)
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia()
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.fromTo(
+          '[data-anim]',
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.5, stagger: 0.07, ease: 'power2.out' },
+        )
+      })
+    },
+    { scope: containerRef },
+  )
 
   const onboarded =
     auth.data && settings.data && analytics.data
@@ -59,8 +94,11 @@ function Console() {
   const tunnelHost = hostOf(settings.data?.tunnelUrl)
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 sm:py-12">
-      <header className="space-y-3">
+    <div
+      ref={containerRef}
+      className="console-anim mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 sm:py-12"
+    >
+      <header className="space-y-3" data-anim>
         <div className="flex items-start justify-between gap-4">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{m.console_title()}</h1>
           <Button
@@ -74,23 +112,20 @@ function Console() {
             {refreshUsage.isPending ? m.usage_refreshing() : m.usage_refresh()}
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span>{m.console_endpoint_label()}</span>
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
-            {CURSOR_SENTINEL_MODEL}
-          </code>
-          <span aria-hidden>·</span>
-          {tunnelHost ? (
-            <code className="font-mono">{tunnelHost}</code>
-          ) : (
-            <span className="text-amber-500">{m.console_no_tunnel()}</span>
-          )}
-        </div>
+        <SystemHeartbeat
+          activeProvider={activeProvider}
+          connected={connected}
+          tunnelHost={tunnelHost}
+          requests24h={analytics.data?.cursorRequests ?? 0}
+          lastRequestAt={analytics.data?.lastRequestAt ?? null}
+        />
       </header>
 
-      <RoutingStrip activeProvider={activeProvider} connected={connected} />
+      <div data-anim>
+        <RoutingStrip activeProvider={activeProvider} connected={connected} />
+      </div>
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+      <div className="grid items-stretch gap-4 lg:grid-cols-2" data-anim>
         {PROVIDER_ORDER.map((provider) => (
           <ProviderPanel
             key={provider}
@@ -103,7 +138,9 @@ function Console() {
         ))}
       </div>
 
-      <ActivityPanel />
+      <div data-anim>
+        <ActivityPanel />
+      </div>
     </div>
   )
 }

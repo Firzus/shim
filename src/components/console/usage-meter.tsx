@@ -4,10 +4,11 @@
 // shapes: Codex `rate_limit.{primary,secondary}_window` and Anthropic's
 // header-derived `{ fiveHour, weekly }` snapshot.
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useState } from 'react'
 
 import type { ProviderUsage } from '@/lib/api/types'
 import { m } from '@/paraglide/messages'
+import { useNow } from '@/lib/use-now'
 import { cn } from '@/lib/utils'
 import type { ProviderId } from './provider-mark'
 
@@ -133,15 +134,6 @@ function CapturedAgo({ stalenessMs }: { stalenessMs: number | null }) {
   const [base] = useState(() => Date.now())
   const live = stalenessMs === null ? null : stalenessMs + Math.max(0, now - base)
   return <>{m.usage_captured({ ago: formatAgo(live) })}</>
-}
-
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(id)
-  }, [])
-  return now
 }
 
 function toneFor(pct: number): 'ok' | 'warn' | 'danger' {

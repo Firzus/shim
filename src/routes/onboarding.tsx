@@ -35,7 +35,10 @@ function OnboardingPage() {
 
   const idx = stepIndex(step)
   const total = STEPS.length
-  const progress = ((idx + 1) / total) * 100
+  // Endowed-progress: the bar opens partly filled so step one already feels
+  // underway, then still resolves to a true 100% on the final step.
+  const ENDOWED = 12
+  const progress = ENDOWED + ((idx + 1) / total) * (100 - ENDOWED)
 
   function go(next: OnboardingStep): void {
     void navigate({ to: '/onboarding', search: { step: next } })

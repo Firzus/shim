@@ -148,6 +148,8 @@
   "test_ready": "You're ready to use shim from Cursor.",
   "test_failed_title": "Test failed — {status}",
   "test_transport_error": "transport error",
+  "test_connected_latency": "Connected — first token in {latencyMs}ms",
+  "test_open_cursor": "Open Cursor now",
 
   "error_something_wrong": "something went wrong",
   "error_try_again": "try again",
@@ -196,6 +198,16 @@
   "activity_errors": "Errors",
   "activity_tokens_in": "Tokens in",
   "activity_tokens_out": "Tokens out",
+  "activity_sparkline_label": "Hourly request volume, last 24h",
+
+  "heartbeat_proxy_active": "Proxy live",
+  "heartbeat_proxy_degraded": "Proxy degraded",
+  "heartbeat_routing_to": "routing to {provider}",
+  "heartbeat_requests_24h": "{count} requests · 24h",
+  "heartbeat_last_request": "last request {ago} ago",
+  "heartbeat_no_requests": "no requests yet",
+  "heartbeat_nudge_not_connected": "{provider} not connected — no routing fallback",
+  "heartbeat_nudge_connect": "Connect",
 
   "toast_provider_switched": "Now routing to {provider}",
 
