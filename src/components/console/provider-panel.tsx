@@ -58,7 +58,10 @@ export function ProviderPanel({
   }
 
   return (
-    <Card className={cn('gap-0', isActive ? 'ring-primary/40' : 'ring-foreground/10')}>
+    <Card
+      id={`provider-panel-${provider}`}
+      className={cn('gap-0', isActive ? 'ring-primary/40 elevation-active' : 'ring-foreground/10')}
+    >
       <div className="flex flex-1 flex-col gap-4 px-4">
         {/* Identity + status */}
         <div className="flex items-start justify-between gap-3">

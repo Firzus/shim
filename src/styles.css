@@ -79,6 +79,9 @@
   --border: oklch(0.263 0.013 100.5 / 0.1);
   --input: oklch(0.263 0.013 100.5 / 0.1);
   --ring: oklch(0.652 0.214 38 / 0.5);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px -8px oklch(0 0 0 / 0.12);
+  --shadow-card-active:
+    0 1px 2px oklch(0 0 0 / 0.06), 0 10px 30px -8px oklch(0.652 0.214 38 / 0.22);
 }
 
 /* Dark palette — Cursor's default. */
@@ -104,6 +107,8 @@
   --border: oklch(0.944 0.001 17.2 / 0.1);
   --input: oklch(0.944 0.001 17.2 / 0.1);
   --ring: oklch(0.652 0.214 38 / 0.5);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px -8px oklch(0 0 0 / 0.5);
+  --shadow-card-active: 0 1px 2px oklch(0 0 0 / 0.4), 0 10px 30px -8px oklch(0.652 0.214 38 / 0.28);
 }
 
 @layer base {
@@ -160,5 +165,33 @@
   }
   *::-webkit-scrollbar-corner {
     background: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Depth — layered card elevation. Cards already carry a 1px ring; the shadow
+ * adds quiet vertical depth so panels read as surfaces, not outlines. The
+ * `-active` variant tints the spread with the orange accent for the routing
+ * target. Tokens live per-theme above (`--shadow-card*`).
+ * --------------------------------------------------------------------------- */
+@utility elevation {
+  box-shadow: var(--shadow-card);
+}
+@utility elevation-active {
+  box-shadow: var(--shadow-card-active);
+}
+
+/* ---------------------------------------------------------------------------
+ * Entry orchestration — the console reveals its blocks with a staggered GSAP
+ * timeline. The hidden initial state is declared here (not in JS) so the
+ * SSR'd HTML renders already hidden — no flash before the timeline runs.
+ * When motion is reduced, the timeline never builds and content stays shown.
+ * --------------------------------------------------------------------------- */
+.console-anim [data-anim] {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .console-anim [data-anim] {
+    opacity: 1 !important;
   }
 }

@@ -30,8 +30,14 @@ export const recordRequest = mutation({
   },
 })
 
+const HOUR_MS = 60 * 60 * 1000
+const HOURLY_BUCKETS = 24
+
 // Aggregated summary over [since, until]. `now` is passed in (Date.now() in
-// queries breaks Convex caching).
+// queries breaks Convex caching). Alongside the flat totals, `hourly` carries
+// 24 fixed buckets covering the last 24h before `periodEnd` (oldest first),
+// for the dashboard sparkline; rows older than that window are still counted
+// in the totals but fall outside every bucket.
 export const getAnalytics = query({
   args: {
     since: v.number(),
@@ -51,6 +57,14 @@ export const getAnalytics = query({
     let errorRequests = 0
     let totalInputTokens = 0
     let totalOutputTokens = 0
+    let lastRequestAt: number | null = null
+
+    const windowStart = periodEnd - HOURLY_BUCKETS * HOUR_MS
+    const hourly = Array.from({ length: HOURLY_BUCKETS }, (_, i) => ({
+      hour: windowStart + i * HOUR_MS,
+      requests: 0,
+      errors: 0,
+    }))
 
     for (const row of rows) {
       totalRequests++
@@ -58,6 +72,13 @@ export const getAnalytics = query({
       else if (row.source === 'error') errorRequests++
       totalInputTokens += row.inputTokens ?? 0
       totalOutputTokens += row.outputTokens ?? 0
+      if (lastRequestAt === null || row.timestamp > lastRequestAt) lastRequestAt = row.timestamp
+
+      const idx = Math.floor((row.timestamp - windowStart) / HOUR_MS)
+      if (idx >= 0 && idx < HOURLY_BUCKETS) {
+        if (row.source === 'cursor') hourly[idx].requests++
+        else if (row.source === 'error') hourly[idx].errors++
+      }
     }
 
     return {
@@ -68,6 +89,8 @@ export const getAnalytics = query({
       totalOutputTokens,
       periodStart: since,
       periodEnd,
+      lastRequestAt,
+      hourly,
     }
   },
 })
