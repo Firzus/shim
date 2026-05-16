@@ -1,5 +1,5 @@
 {
-  "_comment": "Synthetic Cursor Chat-Completions-shape body — what Cursor emits when the configured model name (e.g. 'codex') isn't on its reasoning-model heuristic list. TODO: replace with a real cctc capture once available.",
+  "_comment": "Synthetic Cursor Chat-Completions-shape body — what Cursor emits when the configured model name (e.g. 'codex') isn't on its reasoning-model heuristic list. Replace with a real capture when available.",
   "model": "codex",
   "stream": true,
   "messages": [

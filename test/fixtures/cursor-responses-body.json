@@ -1,5 +1,5 @@
 {
-  "_comment": "Synthetic minimal Cursor Responses-API-shaped body. TODO: replace with a real cctc capture for fidelity on edge cases (multi-turn reasoning chains, parallel tool calls, image inputs).",
+  "_comment": "Synthetic minimal Cursor Responses-API-shaped body. Replace with a real capture when available for fidelity on edge cases (multi-turn reasoning chains, parallel tool calls, image inputs).",
   "model": "codex",
   "stream": true,
   "input": [
