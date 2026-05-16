@@ -11,21 +11,21 @@
 
 import { createServerFn } from '@tanstack/react-start'
 
-import { api } from '#/../convex/_generated/api'
-import { convex } from '#/lib/server/convex'
-import { logger, toErrorMessage } from '#/lib/server/logger'
-import { exchangeAndPersist } from '#/lib/server/oauth/exchange'
-import { startCallbackListener } from '#/lib/server/oauth/listener'
-import { generatePKCE } from '#/lib/server/oauth/pkce'
-import { startPlanUsagePoller, tickPlanUsage } from '#/lib/server/plan-usage-poller'
-import { getProvider } from '#/lib/server/providers'
-import type { Provider, ProviderId } from '#/lib/server/providers'
+import { api } from '@/../convex/_generated/api'
+import { convex } from '@/lib/server/convex'
+import { logger, toErrorMessage } from '@/lib/server/logger'
+import { exchangeAndPersist } from '@/lib/server/oauth/exchange'
+import { startCallbackListener } from '@/lib/server/oauth/listener'
+import { generatePKCE } from '@/lib/server/oauth/pkce'
+import { startPlanUsagePoller, tickPlanUsage } from '@/lib/server/plan-usage-poller'
+import { getProvider } from '@/lib/server/providers'
+import type { Provider, ProviderId } from '@/lib/server/providers'
 import {
   getShimSettings,
   invalidateShimSettingsCache,
   normalizeTunnelUrl,
   resolveTunnelUrl,
-} from '#/lib/server/settings'
+} from '@/lib/server/settings'
 
 import {
   AnalyticsQuerySchema,

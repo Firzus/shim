@@ -1,4 +1,4 @@
-import { api } from '#/../convex/_generated/api'
+import { api } from '@/../convex/_generated/api'
 
 import { convex } from './convex'
 import { logger, toErrorMessage } from './logger'

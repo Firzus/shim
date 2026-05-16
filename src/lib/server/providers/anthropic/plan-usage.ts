@@ -3,7 +3,7 @@
 // /v1/messages call. The client calls `captureAnthropicUsage` after each
 // upstream response; the parsed snapshot is throttled into Convex.
 
-import { api } from '#/../convex/_generated/api'
+import { api } from '@/../convex/_generated/api'
 import { convex } from '../../convex'
 import { logger, toErrorMessage } from '../../logger'
 

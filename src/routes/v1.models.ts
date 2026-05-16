@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ipWhitelistGuard } from '#/lib/server/middleware'
-import { getRegisteredProviders } from '#/lib/server/providers'
+import { ipWhitelistGuard } from '@/lib/server/middleware'
+import { getRegisteredProviders } from '@/lib/server/providers'
 
 // OpenAI-conventional path. Mirrors /api/v1/models — Cursor BYOK typically
 // targets `<baseUrl>/models` from a configured `<baseUrl>/v1` so we expose

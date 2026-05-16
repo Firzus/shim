@@ -28,7 +28,7 @@ docker compose --profile prod up -d app  # (unverified; production-like local co
 
 - Package manager: `pnpm@11.1.2`; keep `pnpm-lock.yaml` authoritative.
 - Module style: ESM (`"type": "module"`), TypeScript strict mode, React JSX runtime.
-- Imports: prefer `#/...` or `@/...` aliases for `src/...`; both are configured in `tsconfig.json`.
+- Imports: use the `@/...` alias for `src/...`; configured in `tsconfig.json`.
 - Routing: use TanStack Router file routes in `src/routes`; API endpoints use `createFileRoute(...).server.handlers`.
 - Server logic: keep route handlers thin; put reusable server code under `src/lib/server/**`.
 - Convex: schema/functions live in `convex/**`; generated files in `convex/_generated/**` are read-only.

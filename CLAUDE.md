@@ -93,7 +93,7 @@ The dashboard talks to the server through **TanStack Start server functions** (`
 
 ### Important conventions
 
-- **Import aliases**: prefer `#/...` or `@/...` (both map to `src/...`).
+- **Import aliases**: use `@/...` (maps to `src/...`).
 - **TypeScript strict**: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `noUncheckedSideEffectImports` all on. No `any`.
 - **ESM + `verbatimModuleSyntax`**: use `import type { ... }` for type-only imports.
 - **Server vs client split**: anything under `src/lib/server/**` and `src/routes/api/**` is server-only. Route components in `src/routes/*.tsx` may be isomorphic. `src/lib/api/server-fns.ts` is isomorphic-by-design — the plugin extracts `.handler()` bodies — so server-only modules there must be used **only inside handlers**. OAuth tokens, Convex admin operations, and upstream HTTP **never** touch client bundles.
