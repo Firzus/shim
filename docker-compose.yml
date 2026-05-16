@@ -47,8 +47,9 @@ services:
     stop_signal: SIGINT
     ports:
       # Bound to loopback only — both `vp dev` on the host and the local CLI
-      # reach Convex via 127.0.0.1:3220. Ports are shifted up by 10 from cctc
-      # (3210/3211) so the sibling project can run alongside shim.
+      # reach Convex via 127.0.0.1:3220. Ports are shifted up by 10 from the
+      # Convex defaults (3210/3211) so a sibling Convex project can run
+      # alongside shim without colliding.
       - '127.0.0.1:3220:3210'
       - '127.0.0.1:3222:3211'
     volumes:
@@ -118,8 +119,8 @@ services:
     restart: unless-stopped
     # `--metrics 0.0.0.0:2000` exposes the official cloudflared metrics +
     # `/ready` JSON endpoint inside the container. We publish only
-    # 127.0.0.1:2001 on the host (shim uses 2001, cctc uses 2000) so both
-    # tunnels coexist without port collisions.
+    # 127.0.0.1:2001 on the host so a sibling cloudflared running on the
+    # default 2000 can coexist without port collisions.
     command: tunnel --metrics 0.0.0.0:2000 --protocol http2 run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
