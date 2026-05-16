@@ -14,9 +14,11 @@
     "fmt": "vp fmt",
     "test": "vp test run",
     "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
-    "postinstall": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
+    "postinstall": "pnpm run i18n:compile",
     "prepare": "node -e \"require('node:fs').existsSync('.git') && require('node:child_process').execSync('vp config', { stdio: 'inherit' })\"",
-    "convex:deploy": "vpx convex dev --once"
+    "convex:deploy": "vpx convex dev --once",
+    "start": "docker compose --profile prod up -d --build --wait",
+    "stop": "docker compose --profile prod down"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

@@ -126,6 +126,8 @@ Cursor rejects `localhost` and other private network URLs. Point your tunnel ing
 | `pnpm fmt`                    | Format the repo with `vp fmt`.                                         |
 | `pnpm i18n:compile`           | Compile `messages/*.json` into `src/paraglide/`.                       |
 | `pnpm convex:deploy`          | Run local Convex schema/function sync with `vpx convex dev --once`.    |
+| `pnpm start`                  | Build the app image and bring up the full prod stack with Docker Compose. |
+| `pnpm stop`                   | Stop and remove the full prod stack (`docker compose --profile prod down`). |
 
 ## Docker profiles
 
@@ -136,6 +138,17 @@ docker compose --profile prod up -d app
 
 - **Default services** — local Convex, the Convex dashboard, and the Cloudflare tunnel (`cloudflared`). The tunnel is mandatory and requires `CLOUDFLARE_TUNNEL_TOKEN`.
 - **`prod` profile** — builds and runs the app container behind the same local ports.
+
+### One-shot prod bring-up
+
+`pnpm start` runs `docker compose --profile prod up -d --build --wait`: it builds the
+app image and starts every service — Convex, the Convex dashboard, `cloudflared`, and the
+app container — waiting until each is healthy. `pnpm stop` tears the whole stack back
+down (`docker compose --profile prod down`).
+
+On a first boot, run `pnpm start` once to start Convex, copy the admin key from the Convex
+container logs into `.env` as `CONVEX_SELF_HOSTED_ADMIN_KEY`, run `pnpm convex:deploy` to
+sync the schema, then `pnpm start` again.
 
 ## API surface
 
