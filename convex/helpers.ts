@@ -3,48 +3,57 @@ import type { DataModel } from './_generated/dataModel'
 
 export const SINGLETON_KEY = 'singleton' as const
 
+export type ProviderId = 'codex' | 'anthropic'
+
 type Ctx = GenericMutationCtx<DataModel>
 
-// Upsert helpers for singleton tables (`by_key` indexed, one row keyed
-// `"singleton"`). One helper per table keeps the types concrete; add a new
-// helper when introducing a new singleton.
+// Upsert helpers for the dashboard-owned tables. `oauthTokens` and
+// `planUsageSnapshot` hold one row per provider (`by_provider` indexed);
+// `shimSettings` is a true singleton (`by_key`).
 
 export async function upsertOauthTokens(
   ctx: Ctx,
   args: {
+    provider: ProviderId
     accessToken: string
     refreshToken: string
-    idToken?: string
-    chatgptAccountId: string
-    planType?: string | null
     expiresAt: number
-    scopes: string[]
     obtainedAt: number
+    scopes: string[]
+    planType?: string | null
+    metadata?: unknown
   },
 ): Promise<void> {
   const existing = await ctx.db
     .query('oauthTokens')
-    .withIndex('by_key', (q) => q.eq('key', SINGLETON_KEY))
+    .withIndex('by_provider', (q) => q.eq('provider', args.provider))
     .unique()
   if (existing) await ctx.db.patch(existing._id, args)
-  else await ctx.db.insert('oauthTokens', { key: SINGLETON_KEY, ...args })
+  else await ctx.db.insert('oauthTokens', args)
 }
 
 export async function upsertPlanUsageSnapshot(
   ctx: Ctx,
-  args: { capturedAt: number; raw?: unknown },
+  args: { provider: ProviderId; capturedAt: number; raw?: unknown },
 ): Promise<void> {
   const existing = await ctx.db
     .query('planUsageSnapshot')
-    .withIndex('by_key', (q) => q.eq('key', SINGLETON_KEY))
+    .withIndex('by_provider', (q) => q.eq('provider', args.provider))
     .unique()
   if (existing) await ctx.db.patch(existing._id, args)
-  else await ctx.db.insert('planUsageSnapshot', { key: SINGLETON_KEY, ...args })
+  else await ctx.db.insert('planUsageSnapshot', args)
 }
 
 export async function upsertShimSettings(
   ctx: Ctx,
-  args: { model?: string; reasoningEffort?: string; tunnelUrl?: string },
+  args: {
+    activeProvider?: ProviderId
+    codexModel?: string
+    codexEffort?: string
+    anthropicModel?: string
+    anthropicEffort?: string
+    tunnelUrl?: string
+  },
 ): Promise<void> {
   const existing = await ctx.db
     .query('shimSettings')

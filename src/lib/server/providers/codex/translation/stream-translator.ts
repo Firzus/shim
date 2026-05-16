@@ -1,4 +1,4 @@
-import { SSELineBuffer } from './sse-parser'
+import { SSELineBuffer } from '../../../translation/sse-parser'
 import {
   type CodexStreamEvent,
   getEventError,

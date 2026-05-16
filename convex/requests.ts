@@ -9,6 +9,7 @@ export const recordRequest = mutation({
   args: {
     timestamp: v.number(),
     model: v.string(),
+    provider: v.optional(v.union(v.literal('codex'), v.literal('anthropic'))),
     source: v.union(v.literal('cursor'), v.literal('error')),
     stream: v.boolean(),
     inputTokens: v.optional(v.union(v.number(), v.null())),
@@ -96,6 +97,7 @@ export const getRecentRequests = query({
         id: row._id,
         timestamp: row.timestamp,
         model: row.model,
+        provider: row.provider ?? null,
         source: row.source,
         stream: row.stream,
         inputTokens: row.inputTokens ?? null,

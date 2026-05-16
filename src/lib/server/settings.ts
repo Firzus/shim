@@ -1,47 +1,43 @@
-import { api } from '#/../convex/_generated/api'
+import { api } from '@/../convex/_generated/api'
 
 import { convex } from './convex'
 import { logger, toErrorMessage } from './logger'
+import { getProvider } from './providers'
+import type { ProviderId } from './providers/types'
 
 // Short-lived cache around the dashboard-owned `shimSettings` singleton.
 
 const CACHE_TTL_MS = 3_000
 
-export const ACCEPTED_REASONING_EFFORTS = ['low', 'medium', 'high', 'extra-high'] as const
-
-export type ReasoningEffort = (typeof ACCEPTED_REASONING_EFFORTS)[number]
-
+// The model + effort resolved for the *active* provider. The active provider's
+// translation layer interprets `reasoningEffort` (the vocabularies differ).
 export interface ShimSettings {
+  activeProvider: ProviderId
   model: string
-  reasoningEffort: ReasoningEffort
-}
-
-const DEFAULTS: ShimSettings = {
-  model: 'gpt-5.5',
-  reasoningEffort: 'high',
+  reasoningEffort: string
 }
 
 let cache: { value: ShimSettings; expiresAt: number } | null = null
 
-function isReasoningEffort(raw: string | null | undefined): raw is ReasoningEffort {
-  return typeof raw === 'string' && (ACCEPTED_REASONING_EFFORTS as readonly string[]).includes(raw)
-}
-
-function normalizeEffort(raw: string | null | undefined): ReasoningEffort {
-  return isReasoningEffort(raw) ? raw : DEFAULTS.reasoningEffort
+function defaultsFor(provider: ProviderId): ShimSettings {
+  const meta = getProvider(provider).meta
+  return { activeProvider: provider, model: meta.defaultModel, reasoningEffort: meta.defaultEffort }
 }
 
 export async function getShimSettings(): Promise<ShimSettings> {
   if (cache && cache.expiresAt > Date.now()) return cache.value
 
-  let value: ShimSettings = DEFAULTS
+  let value: ShimSettings = defaultsFor('codex')
   try {
     const row = await convex.query(api.shimSettings.get, {})
-    if (row) {
-      value = {
-        model: row.model && row.model.length > 0 ? row.model : DEFAULTS.model,
-        reasoningEffort: normalizeEffort(row.reasoningEffort),
-      }
+    const activeProvider: ProviderId = row?.activeProvider ?? 'codex'
+    const meta = getProvider(activeProvider).meta
+    const storedModel = activeProvider === 'codex' ? row?.codexModel : row?.anthropicModel
+    const storedEffort = activeProvider === 'codex' ? row?.codexEffort : row?.anthropicEffort
+    value = {
+      activeProvider,
+      model: storedModel && storedModel.length > 0 ? storedModel : meta.defaultModel,
+      reasoningEffort: storedEffort && storedEffort.length > 0 ? storedEffort : meta.defaultEffort,
     }
   } catch (err) {
     logger.warn(`[settings] failed to load shimSettings: ${toErrorMessage(err)}`)
@@ -54,8 +50,6 @@ export async function getShimSettings(): Promise<ShimSettings> {
 export function invalidateShimSettingsCache(): void {
   cache = null
 }
-
-export const SHIM_SETTINGS_DEFAULTS: ShimSettings = DEFAULTS
 
 // Validate & normalize a tunnel URL string. Cursor BYOK rejects private
 // networks ("Access to private networks is forbidden"), so we accept only

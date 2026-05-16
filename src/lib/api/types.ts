@@ -22,7 +22,9 @@ export type { SaveSettingsInput } from './schemas'
 export type AuthStatus = Awaited<ReturnType<typeof getAuthStatus>>
 export type Settings = Awaited<ReturnType<typeof getSettings>>
 export type Analytics = Awaited<ReturnType<typeof getAnalytics>>
+// getUsage now returns both providers; `ProviderUsage` is the per-provider slice.
 export type UsageSnapshot = Awaited<ReturnType<typeof getUsage>>
+export type ProviderUsage = UsageSnapshot['codex']
 export type LoginResponse = Awaited<ReturnType<typeof initLogin>>
 export type CallbackResponse = Awaited<ReturnType<typeof exchangeCallback>>
 export type TestResponse = Awaited<ReturnType<typeof runTestConnection>>

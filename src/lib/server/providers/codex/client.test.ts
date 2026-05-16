@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the OAuth module so tests don't reach Convex / network.
-vi.mock('./oauth/codex-oauth', () => ({
+vi.mock('./oauth', () => ({
   getValidToken: vi.fn(),
   clearCachedToken: vi.fn(),
 }))
 
-import { postCodexResponses } from './codex-client'
-import { clearCachedToken, getValidToken } from './oauth/codex-oauth'
-import { CODEX_RESPONSES_URL } from './oauth/constants'
+import { postCodexResponses } from './client'
+import { CODEX_RESPONSES_URL } from './constants'
+import { clearCachedToken, getValidToken } from './oauth'
 
 const mockedGetValidToken = vi.mocked(getValidToken)
 const mockedClearCachedToken = vi.mocked(clearCachedToken)

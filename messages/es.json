@@ -12,13 +12,13 @@
   "nav_settings": "Ajustes",
   "nav_open_menu": "Abrir menú",
 
-  "footer_tagline": "proxy byok de codex",
+  "footer_tagline": "proxy byok",
   "footer_source": "código fuente",
 
   "lang_switcher_label": "Idioma",
 
   "auth_checking": "comprobando…",
-  "auth_disconnected": "desconectado — inicia sesión con Codex",
+  "auth_disconnected": "desconectado — inicia sesión con un proveedor",
   "auth_expiring": "el token expira en {expiry} — vuelve a autenticarte pronto",
   "auth_connected": "conectado",
 
@@ -80,10 +80,10 @@
   "byok_step2_tail": " y pega los valores de abajo.",
   "byok_step3_lead": "Pega ",
   "byok_step3_em": "cualquier cadena no vacía",
-  "byok_step3_tail": " como clave de API — shim usa tu sesión de ChatGPT, no la clave.",
+  "byok_step3_tail": " como clave de API — shim usa la sesión de tu proveedor, no la clave.",
   "byok_base_url": "URL base",
   "byok_model_name": "Nombre del modelo",
-  "byok_model_hint": "shim lo cambia por el modelo de Codex que elijas",
+  "byok_model_hint": "shim lo cambia por el modelo de tu proveedor activo",
   "byok_copy": "Copiar",
   "byok_copied": "Copiado",
   "byok_copy_aria": "Copiar {label}",
@@ -91,14 +91,14 @@
 
   "onboarding_skip": "Omitir configuración",
   "onboarding_step_progress": "Paso {current} de {total}",
-  "onboarding_step_welcome": "Conectar ChatGPT",
+  "onboarding_step_welcome": "Conectar un proveedor",
   "onboarding_step_model": "Elegir un modelo",
   "onboarding_step_tunnel": "Exponer públicamente",
   "onboarding_step_cursor": "Configurar Cursor",
   "onboarding_step_test": "Probar la conexión",
 
   "welcome_title": "Bienvenido a shim.",
-  "welcome_subtitle": "Un proxy local que expone tu suscripción a ChatGPT Plus / Pro a Cursor mediante el flujo OAuth de Codex. Vamos a configurarlo.",
+  "welcome_subtitle": "Un proxy local que conecta tus suscripciones de ChatGPT y Claude con Cursor. Conecta al menos un proveedor para empezar.",
   "welcome_signin_title": "Primero, inicia sesión con ChatGPT",
   "welcome_signin_desc": "Abriremos una pestaña a ChatGPT para el intercambio OAuth de Codex. Tus tokens permanecen en esta máquina — nunca salen de tu instancia local de Convex.",
   "welcome_signed_in": "Sesión iniciada",
@@ -108,7 +108,7 @@
   "welcome_exchange": "Intercambiar",
 
   "model_title": "Elegir un modelo",
-  "model_subtitle": "shim sustituye lo que Cursor envíe por el modelo que elijas aquí. Puedes cambiarlo en cualquier momento desde Ajustes.",
+  "model_subtitle": "shim sustituye lo que Cursor envíe por el modelo que elijas. Puedes cambiarlo en cualquier momento desde la consola.",
   "model_picker_model": "Modelo",
   "model_picker_effort": "Esfuerzo de razonamiento",
   "effort_tip_low": "poco razonamiento",
@@ -167,5 +167,37 @@
   "toast_authorize_opened": "pestaña de autorización abierta",
   "toast_authorize_waiting": "esperando la respuesta de localhost:1455…",
   "toast_authorize_listener_unavailable": "receptor no disponible — pega la URL de redirección abajo tras el consentimiento.",
-  "toast_signed_in": "sesión iniciada"
+  "toast_signed_in": "sesión iniciada",
+
+  "state_expiring": "expira pronto",
+
+  "console_title": "Consola",
+  "console_endpoint_label": "Modelo de Cursor",
+  "console_no_tunnel": "sin túnel definido",
+
+  "routing_label": "Enrutamiento",
+  "routing_desc": "El tráfico `shim` de Cursor se enruta al proveedor activo.",
+  "routing_live": "En vivo",
+  "routing_activate": "Activar",
+  "routing_connect_first": "Conecta primero {provider}",
+
+  "provider_connect": "Conectar {provider}",
+  "provider_disconnected_desc": "No conectado. Autoriza para enrutar el tráfico aquí.",
+
+  "connect_paste_placeholder": "Pega la URL de redirección o el código",
+  "connect_complete": "Completar",
+  "connect_hint": "Autoriza en la nueva pestaña y pega el resultado aquí. ChatGPT puede completarse solo.",
+
+  "usage_awaiting": "Esperando tráfico — el uso aparece tras la primera petición.",
+
+  "activity_title": "Actividad",
+  "activity_window": "Últimas 24 h",
+  "activity_requests": "Peticiones",
+  "activity_errors": "Errores",
+  "activity_tokens_in": "Tokens de entrada",
+  "activity_tokens_out": "Tokens de salida",
+
+  "toast_provider_switched": "Ahora se enruta a {provider}",
+
+  "model_provider_label": "Proveedor activo"
 }

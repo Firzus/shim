@@ -1,21 +1,13 @@
-import { api } from '#/../convex/_generated/api'
+import { api } from '@/../convex/_generated/api'
 
-import { postCodexResponses } from '../codex-client'
 import { convex } from '../convex'
 import { logger, toErrorMessage } from '../logger'
 import { corsHeaders, ipWhitelistGuard, logRequestDetails } from '../middleware'
 // Side-effect import: bootstraps the plan-usage poller so proxy traffic alone
 // is enough to keep the snapshot fresh (no need for the dashboard to be open).
 import '../plan-usage-poller'
+import { getProvider } from '../providers'
 import { getShimSettings } from '../settings'
-import { buildCodexFromResponsesBody } from '../translation/responses-passthrough'
-import {
-  applyEventToBuffer,
-  bufferToCompletion,
-  freshBuffer,
-} from '../translation/responses-to-chat'
-import { SSELineBuffer } from '../translation/sse-parser'
-import { createOpenAIStreamFromCodex } from '../translation/stream-translator'
 
 function openaiErrorBody(
   type: 'invalid_request_error' | 'internal_error' | 'api_error' | 'authentication_error',
@@ -27,6 +19,7 @@ function openaiErrorBody(
 interface RecordRequestArgs {
   timestamp: number
   model: string
+  provider?: 'codex' | 'anthropic'
   source: 'cursor' | 'error'
   stream: boolean
   inputTokens?: number | null
@@ -71,13 +64,23 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     })
   }
 
-  // Cursor BYOK always sends a Responses-API-shaped body at /v1/chat/completions:
-  // `input[]` items with `reasoning.encrypted_content` carry state across turns.
-  // Going through a Chat-shape adapter strips that and breaks tool-using prompts,
-  // so we forward verbatim.
-  const passthrough = buildCodexFromResponsesBody(rawBody)
-  const body = passthrough.body
-  const promptCacheKey = passthrough.promptCacheKey
+  // Dashboard settings own the active provider + model + effort. Cursor sends
+  // a sentinel model name (`shim`); the dashboard is the single source of truth.
+  const settings = await getShimSettings()
+  const provider = getProvider(settings.activeProvider)
+
+  // Stamp every analytics row with the provider that served the request.
+  const record = (args: Omit<RecordRequestArgs, 'provider'>): Promise<void> =>
+    recordRequestSafe({ ...args, provider: provider.meta.id })
+
+  // Each provider builds its own upstream body shape from Cursor's raw body
+  // and stamps in the dashboard-resolved model + effort.
+  const built = provider.translation.buildUpstreamBody(rawBody, {
+    model: settings.model,
+    effort: settings.reasoningEffort,
+  })
+  const body = built.body
+  const promptCacheKey = built.promptCacheKey
   const source = 'cursor' as const
 
   // Codex routes by Session_id / Conversation_id headers (not just the body's
@@ -87,25 +90,10 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   const sessionId = promptCacheKey
   const conversationId = promptCacheKey
   const streamId = `chatcmpl-${crypto.randomUUID()}`
-  const toolDefsCount = Array.isArray(body.tools) ? body.tools.length : 0
-  const requestedModel = passthrough.modelMapping.requested
-  let appliedModel = passthrough.modelMapping.applied
-  const reqModel = typeof rawBody.model === 'string' ? rawBody.model : ''
+  const { toolDefsCount, requestedModel, appliedModel } = built
   logger.debug(
-    `[chat] passthrough model="${reqModel}" → "${passthrough.modelMapping.applied}" items=${passthrough.inputItemCount} tools=${toolDefsCount} instrLen=${passthrough.systemPromptLen} cacheKey=${promptCacheKey}`,
+    `[chat] provider=${provider.meta.id} model="${requestedModel}" → "${appliedModel}" items=${built.inputItemCount} tools=${toolDefsCount} instrLen=${built.systemPromptLen} cacheKey=${promptCacheKey}`,
   )
-
-  // Dashboard settings own model + effort.
-  const settings = await getShimSettings()
-  body.model = settings.model
-  const existingReasoning = (body.reasoning as Record<string, unknown> | undefined) ?? {}
-  const effort = settings.reasoningEffort
-  body.reasoning = {
-    ...existingReasoning,
-    effort,
-  }
-  appliedModel = settings.model
-  logger.debug(`[chat] settings override model=${settings.model} effort=${effort}`)
 
   const wantsStream = rawBody.stream !== false
   const streamOptions =
@@ -113,13 +101,28 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       ? (rawBody.stream_options as Record<string, unknown>)
       : null
   const includeUsage = streamOptions?.include_usage === true
-  const reportedModel = reqModel || appliedModel
+  const reportedModel = requestedModel || appliedModel
 
   const startedAt = performance.now()
 
+  // Every failure path records the same metadata shape — only the error string
+  // and the stream flag differ.
+  const recordError = (error: string, stream: boolean): Promise<void> =>
+    record({
+      timestamp: Date.now(),
+      model: appliedModel,
+      source: 'error',
+      stream,
+      latencyMs: Math.round(performance.now() - startedAt),
+      error,
+      requestedModel,
+      appliedModel,
+      toolDefsCount,
+    })
+
   let upstream: Response
   try {
-    upstream = await postCodexResponses({
+    upstream = await provider.upstream.postChatRequest({
       body,
       sessionId,
       conversationId,
@@ -127,17 +130,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   } catch (error) {
     const message = toErrorMessage(error)
     logger.error(`[chat] upstream transport failure: ${message}`)
-    await recordRequestSafe({
-      timestamp: Date.now(),
-      model: appliedModel,
-      source: 'error',
-      stream: wantsStream,
-      latencyMs: Math.round(performance.now() - startedAt),
-      error: message,
-      requestedModel,
-      appliedModel,
-      toolDefsCount,
-    })
+    await recordError(message, wantsStream)
     return Response.json(openaiErrorBody('api_error', message), {
       status: 502,
       headers: corsHeaders(req),
@@ -150,17 +143,7 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       .text()
       .catch(() => 'unable to read upstream error body')
     logger.error(`[chat] upstream ${upstream.status}: ${errorText.substring(0, 2000)}`)
-    await recordRequestSafe({
-      timestamp: Date.now(),
-      model: appliedModel,
-      source: 'error',
-      stream: wantsStream,
-      latencyMs: Math.round(performance.now() - startedAt),
-      error: `${upstream.status} ${errorText.substring(0, 200)}`,
-      requestedModel,
-      appliedModel,
-      toolDefsCount,
-    })
+    await recordError(`${upstream.status} ${errorText.substring(0, 200)}`, wantsStream)
     return Response.json(
       openaiErrorBody(
         upstream.status === 401 ? 'authentication_error' : 'api_error',
@@ -186,19 +169,19 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
     responseHeaders.set('Connection', 'keep-alive')
     responseHeaders.set('X-Accel-Buffering', 'no')
 
-    // Note: even in passthrough INPUT mode, we still translate Codex's
-    // Responses SSE → chat.completion.chunk because Cursor's BYOK parser
-    // only accepts Chat Completions wire format on the output side.
-
-    const translated = createOpenAIStreamFromCodex(upstream.body, {
+    // Even when forwarding the upstream body verbatim, we still translate the
+    // upstream SSE → chat.completion.chunk because Cursor's BYOK parser only
+    // accepts Chat Completions wire format on the output side.
+    const translated = provider.translation.createOpenAIStream(upstream.body, {
       streamId,
       reportedModel,
       includeUsage,
+      providerContext: built.streamContext,
       onUsage: (usage) => {
         logger.debug(
-          `[chat] stream completed in=${usage.promptTokens} out=${usage.completionTokens} cached=${usage.cachedTokens ?? 0}`,
+          `[chat] stream completed in=${usage.promptTokens} out=${usage.completionTokens} cached=${usage.cachedTokens}`,
         )
-        void recordRequestSafe({
+        void record({
           timestamp: Date.now(),
           model: appliedModel,
           source,
@@ -223,61 +206,36 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
   }
 
   // Non-stream path — buffer the SSE and emit a single chat.completion JSON.
-  const reader = upstream.body.getReader()
-  const decoder = new TextDecoder('utf-8')
-  const parser = new SSELineBuffer()
-  const buffer = freshBuffer()
-  try {
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      for (const parsed of parser.push(chunk)) applyEventToBuffer(buffer, parsed.event)
-    }
-    for (const parsed of parser.flush()) applyEventToBuffer(buffer, parsed.event)
-  } catch (error) {
-    return Response.json(openaiErrorBody('api_error', toErrorMessage(error)), {
+  const result = await provider.translation.bufferToCompletion(upstream.body, {
+    streamId,
+    reportedModel,
+    providerContext: built.streamContext,
+  })
+
+  if ('error' in result) {
+    await recordError(result.error, false)
+    return Response.json(openaiErrorBody('api_error', result.error), {
       status: 502,
       headers: corsHeaders(req),
     })
   }
 
-  if (buffer.errored) {
-    await recordRequestSafe({
-      timestamp: Date.now(),
-      model: appliedModel,
-      source: 'error',
-      stream: false,
-      latencyMs: Math.round(performance.now() - startedAt),
-      error: buffer.errored,
-      requestedModel,
-      appliedModel,
-      toolDefsCount,
-    })
-    return Response.json(openaiErrorBody('api_error', buffer.errored), {
-      status: 502,
-      headers: corsHeaders(req),
-    })
-  }
-
-  const completion = bufferToCompletion(buffer, reportedModel, streamId)
-
-  await recordRequestSafe({
+  await record({
     timestamp: Date.now(),
     model: appliedModel,
     source,
     stream: false,
-    inputTokens: completion.usage.prompt_tokens,
-    outputTokens: completion.usage.completion_tokens,
-    totalTokens: completion.usage.total_tokens,
-    cachedTokens: completion.usage.prompt_tokens_details?.cached_tokens ?? null,
+    inputTokens: result.usage.promptTokens,
+    outputTokens: result.usage.completionTokens,
+    totalTokens: result.usage.totalTokens,
+    cachedTokens: result.usage.cachedTokens,
     promptCacheKey,
     latencyMs: Math.round(performance.now() - startedAt),
     requestedModel,
     appliedModel,
     toolDefsCount,
-    toolCallCount: completion.choices[0]?.message.tool_calls?.length ?? 0,
+    toolCallCount: result.toolCallCount,
   })
 
-  return Response.json(completion, { headers: corsHeaders(req) })
+  return Response.json(result.completion, { headers: corsHeaders(req) })
 }

@@ -1,12 +1,12 @@
+import { logger } from '../../logger'
 import {
   CODEX_ORIGINATOR,
   CODEX_RESPONSES_URL,
   CODEX_USAGE_URL,
   CODEX_USER_AGENT,
   CODEX_VERSION,
-} from './oauth/constants'
-import { clearCachedToken, getValidToken } from './oauth/codex-oauth'
-import { logger } from './logger'
+} from './constants'
+import { clearCachedToken, getValidToken } from './oauth'
 import type { CodexResponsesRequest } from './translation/types'
 
 // Accept either the strict Chat-translated body or the looser passthrough

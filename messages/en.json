@@ -12,13 +12,13 @@
   "nav_settings": "Settings",
   "nav_open_menu": "Open menu",
 
-  "footer_tagline": "codex byok proxy",
+  "footer_tagline": "byok proxy",
   "footer_source": "source",
 
   "lang_switcher_label": "Language",
 
   "auth_checking": "checking…",
-  "auth_disconnected": "disconnected — sign in with Codex",
+  "auth_disconnected": "disconnected — sign in to a provider",
   "auth_expiring": "token expires in {expiry} — re-auth soon",
   "auth_connected": "connected",
 
@@ -80,10 +80,10 @@
   "byok_step2_tail": " and paste the values below.",
   "byok_step3_lead": "Paste ",
   "byok_step3_em": "any non-empty string",
-  "byok_step3_tail": " as the API key — shim uses your ChatGPT session, not the key.",
+  "byok_step3_tail": " as the API key — shim uses your provider session, not the key.",
   "byok_base_url": "Base URL",
   "byok_model_name": "Model name",
-  "byok_model_hint": "shim swaps this for your chosen Codex model",
+  "byok_model_hint": "shim swaps this for your active provider's model",
   "byok_copy": "Copy",
   "byok_copied": "Copied",
   "byok_copy_aria": "Copy {label}",
@@ -91,14 +91,14 @@
 
   "onboarding_skip": "Skip setup",
   "onboarding_step_progress": "Step {current} of {total}",
-  "onboarding_step_welcome": "Connect ChatGPT",
+  "onboarding_step_welcome": "Connect a provider",
   "onboarding_step_model": "Pick a model",
   "onboarding_step_tunnel": "Expose publicly",
   "onboarding_step_cursor": "Configure Cursor",
   "onboarding_step_test": "Test the connection",
 
   "welcome_title": "Welcome to shim.",
-  "welcome_subtitle": "A local proxy that exposes your ChatGPT Plus / Pro subscription to Cursor through the Codex OAuth flow. Let's get you set up.",
+  "welcome_subtitle": "A local proxy that bridges your ChatGPT and Claude subscriptions into Cursor. Connect at least one provider to begin.",
   "welcome_signin_title": "First, sign in with ChatGPT",
   "welcome_signin_desc": "We'll open a tab to ChatGPT for the Codex OAuth handshake. Your tokens stay on this machine — they never leave your local Convex instance.",
   "welcome_signed_in": "Signed in",
@@ -108,7 +108,7 @@
   "welcome_exchange": "Exchange",
 
   "model_title": "Pick a model",
-  "model_subtitle": "shim overrides whatever Cursor sends with the model you choose here. You can change it any time from Settings.",
+  "model_subtitle": "shim overrides whatever Cursor sends with the model you choose. Change it any time from the console.",
   "model_picker_model": "Model",
   "model_picker_effort": "Reasoning effort",
   "effort_tip_low": "a little thinking",
@@ -167,5 +167,37 @@
   "toast_authorize_opened": "authorize tab opened",
   "toast_authorize_waiting": "waiting for the localhost:1455 callback…",
   "toast_authorize_listener_unavailable": "listener unavailable — paste the redirect URL below after consent.",
-  "toast_signed_in": "signed in"
+  "toast_signed_in": "signed in",
+
+  "state_expiring": "expiring",
+
+  "console_title": "Console",
+  "console_endpoint_label": "Cursor model",
+  "console_no_tunnel": "no tunnel set",
+
+  "routing_label": "Routing",
+  "routing_desc": "Cursor's `shim` traffic routes to the active provider.",
+  "routing_live": "Live",
+  "routing_activate": "Set active",
+  "routing_connect_first": "Connect {provider} first",
+
+  "provider_connect": "Connect {provider}",
+  "provider_disconnected_desc": "Not connected. Authorize to route traffic here.",
+
+  "connect_paste_placeholder": "Paste the redirect URL or code",
+  "connect_complete": "Complete",
+  "connect_hint": "Authorize in the new tab, then paste the result here. ChatGPT may complete on its own.",
+
+  "usage_awaiting": "Awaiting traffic — usage appears after the first request.",
+
+  "activity_title": "Activity",
+  "activity_window": "Last 24h",
+  "activity_requests": "Requests",
+  "activity_errors": "Errors",
+  "activity_tokens_in": "Tokens in",
+  "activity_tokens_out": "Tokens out",
+
+  "toast_provider_switched": "Now routing to {provider}",
+
+  "model_provider_label": "Active provider"
 }

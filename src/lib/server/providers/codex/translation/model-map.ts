@@ -1,4 +1,4 @@
-import { CODEX_DEFAULT_MODEL } from '../oauth/constants'
+import { CODEX_DEFAULT_MODEL } from '../constants'
 
 // Codex upstream enforces a strict allowlist tied to the subscription plan
 // AND to the declared client version (`Version` header). Any unknown model
@@ -7,13 +7,14 @@ import { CODEX_DEFAULT_MODEL } from '../oauth/constants'
 // `Version` header (see CODEX_VERSION in ../oauth/constants).
 //
 // Allowlist mirrors the model picker exposed by Cursor's BYOK UI on a paid
-// plan (Codex CLI >= 0.150):
-//  - gpt-5.2              ✓
+// plan (Codex CLI >= 0.150). Ordered best-first — the dashboard renders this
+// order verbatim, matching Anthropic's opus → haiku ordering:
+//  - gpt-5.5              ✓ newest, most capable (default)
+//  - gpt-5.4              ✓ flagship
+//  - gpt-5.4-mini         ✓ cheap & fast
 //  - gpt-5.3-codex        ✓ codex specialist
 //  - gpt-5.3-codex-spark  ✓ codex specialist, fast variant
-//  - gpt-5.4              ✓ flagship (default)
-//  - gpt-5.4-mini         ✓ cheap & fast
-//  - gpt-5.5              ✓ newest
+//  - gpt-5.2              ✓ fast workhorse
 //
 // Confirmed REJECTED on lower tiers: gpt-5, gpt-5.0/.1/.6, gpt-5-mini/-nano/
 // -pro/-thinking/-instant, gpt-5.4-nano, gpt-5.5-mini/-pro, gpt-4o family,
@@ -21,12 +22,12 @@ import { CODEX_DEFAULT_MODEL } from '../oauth/constants'
 // and update findings here.
 
 const KNOWN_CODEX_MODELS = new Set<string>([
-  'gpt-5.2',
-  'gpt-5.3-codex',
-  'gpt-5.3-codex-spark',
+  'gpt-5.5',
   'gpt-5.4',
   'gpt-5.4-mini',
-  'gpt-5.5',
+  'gpt-5.3-codex',
+  'gpt-5.3-codex-spark',
+  'gpt-5.2',
 ])
 
 // Map Cursor-side names (and other unsupported variants) to the closest

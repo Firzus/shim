@@ -1,17 +1,23 @@
-import type { CodexStreamEvent } from './types'
-
-// Minimal SSE line-buffer parser. Yields parsed JSON event objects.
-// Lines we ignore: keep-alive comments (`: ...`), empty lines, retry hints.
+// Minimal, provider-agnostic SSE line-buffer parser. Yields parsed JSON event
+// objects. Lines we ignore: keep-alive comments (`: ...`), empty lines.
 //
-// Codex SSE frames look like:
+// Both Codex and Anthropic SSE frames carry a JSON `data:` payload alongside
+// a redundant `event:` line:
 //   event: response.output_text.delta
 //   data: {"type":"response.output_text.delta","delta":"hi"}
 //
 // We only consume `data:` JSON payloads — the `event:` line is redundant
 // because the JSON already carries `type`.
 
+// Open record: the upstream emits a long tail of event types; consumers
+// narrow by inspecting `event.type`.
+export interface SSEEvent {
+  type: string
+  [key: string]: unknown
+}
+
 export interface ParsedEvent {
-  event: CodexStreamEvent
+  event: SSEEvent
   raw: string
 }
 
@@ -77,7 +83,7 @@ export class SSELineBuffer {
   }
 }
 
-function parseFrame(frame: string): CodexStreamEvent | null {
+function parseFrame(frame: string): SSEEvent | null {
   const dataParts: string[] = []
   for (const line of frame.split(/\r?\n/)) {
     if (!line || line.startsWith(':')) continue
@@ -89,7 +95,7 @@ function parseFrame(frame: string): CodexStreamEvent | null {
   const data = dataParts.join('\n')
   if (data === '[DONE]') return null
   try {
-    return JSON.parse(data) as CodexStreamEvent
+    return JSON.parse(data) as SSEEvent
   } catch {
     return null
   }
