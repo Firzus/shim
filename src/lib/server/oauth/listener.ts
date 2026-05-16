@@ -1,11 +1,10 @@
 import { createServer, type Server } from 'node:http'
 
 import { logger } from '../logger'
-import { CODEX_REDIRECT_PORT } from './constants'
 
-// Single in-flight callback listener. Codex hardcodes redirect_uri to
-// http://localhost:1455/auth/callback, so we spin up a local HTTP server
-// only when a login flow is active.
+// Single in-flight callback listener for OAuth flows whose provider registers
+// a localhost loopback redirect URI (Codex). Spun up only while a login flow
+// is active; the port + callback path are provider-supplied.
 
 const TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 const LISTENER_HOST = '127.0.0.1'
@@ -48,12 +47,15 @@ const ERROR_HTML = `<!doctype html>
 </html>`
 
 /**
- * Open an ephemeral HTTP listener on 127.0.0.1:1455 that resolves when the
- * browser hits `/auth/callback?code=...&state=...`. Rejects with `EADDRINUSE`
+ * Open an ephemeral HTTP listener on 127.0.0.1:<port> that resolves when the
+ * browser hits `<callbackPath>?code=...&state=...`. Rejects with `EADDRINUSE`
  * if the port is busy — the caller must then surface the paste-the-URL
  * fallback to the user.
  */
-export function startCallbackListener(): Promise<AwaitedCallback> {
+export function startCallbackListener(
+  port: number,
+  callbackPath: string,
+): Promise<AwaitedCallback> {
   if (active) {
     logger.warn('[oauth] callback listener already active — reusing in-flight promise')
     return active.promise
@@ -80,8 +82,8 @@ export function startCallbackListener(): Promise<AwaitedCallback> {
 
     server = createServer((req, res) => {
       try {
-        const url = new URL(req.url ?? '/', `http://${LISTENER_HOST}:${CODEX_REDIRECT_PORT}`)
-        if (url.pathname !== '/auth/callback') {
+        const url = new URL(req.url ?? '/', `http://${LISTENER_HOST}:${port}`)
+        if (url.pathname !== callbackPath) {
           res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
           res.end('not found')
           return
@@ -115,8 +117,8 @@ export function startCallbackListener(): Promise<AwaitedCallback> {
       reject(error)
     })
 
-    server.listen(CODEX_REDIRECT_PORT, LISTENER_HOST, () => {
-      logger.info(`[oauth] callback listener up on http://${LISTENER_HOST}:${CODEX_REDIRECT_PORT}`)
+    server.listen(port, LISTENER_HOST, () => {
+      logger.info(`[oauth] callback listener up on http://${LISTENER_HOST}:${port}`)
     })
 
     timeoutHandle = setTimeout(() => {

@@ -12,13 +12,13 @@
   "nav_settings": "Einstellungen",
   "nav_open_menu": "Menü öffnen",
 
-  "footer_tagline": "codex byok proxy",
+  "footer_tagline": "byok-proxy",
   "footer_source": "Quellcode",
 
   "lang_switcher_label": "Sprache",
 
   "auth_checking": "wird geprüft…",
-  "auth_disconnected": "getrennt — mit Codex anmelden",
+  "auth_disconnected": "getrennt — bei einem Anbieter anmelden",
   "auth_expiring": "Token läuft in {expiry} ab — bald neu anmelden",
   "auth_connected": "verbunden",
 
@@ -80,10 +80,10 @@
   "byok_step2_tail": " und füge die Werte unten ein.",
   "byok_step3_lead": "Füge ",
   "byok_step3_em": "eine beliebige nicht leere Zeichenfolge",
-  "byok_step3_tail": " als API-Schlüssel ein — shim verwendet deine ChatGPT-Sitzung, nicht den Schlüssel.",
+  "byok_step3_tail": " als API-Schlüssel ein — shim verwendet die Sitzung deines Anbieters, nicht den Schlüssel.",
   "byok_base_url": "Basis-URL",
   "byok_model_name": "Modellname",
-  "byok_model_hint": "shim tauscht dies gegen dein gewähltes Codex-Modell aus",
+  "byok_model_hint": "shim tauscht dies gegen das Modell deines aktiven Anbieters aus",
   "byok_copy": "Kopieren",
   "byok_copied": "Kopiert",
   "byok_copy_aria": "{label} kopieren",
@@ -91,14 +91,14 @@
 
   "onboarding_skip": "Einrichtung überspringen",
   "onboarding_step_progress": "Schritt {current} von {total}",
-  "onboarding_step_welcome": "ChatGPT verbinden",
+  "onboarding_step_welcome": "Anbieter verbinden",
   "onboarding_step_model": "Modell wählen",
   "onboarding_step_tunnel": "Öffentlich bereitstellen",
   "onboarding_step_cursor": "Cursor konfigurieren",
   "onboarding_step_test": "Verbindung testen",
 
   "welcome_title": "Willkommen bei shim.",
-  "welcome_subtitle": "Ein lokaler Proxy, der dein ChatGPT-Plus-/Pro-Abo über den OAuth-Flow von Codex für Cursor verfügbar macht. Richten wir alles ein.",
+  "welcome_subtitle": "Ein lokaler Proxy, der deine ChatGPT- und Claude-Abos in Cursor verfügbar macht. Verbinde mindestens einen Anbieter, um zu beginnen.",
   "welcome_signin_title": "Melde dich zuerst mit ChatGPT an",
   "welcome_signin_desc": "Wir öffnen einen Tab zu ChatGPT für den OAuth-Handshake von Codex. Deine Tokens bleiben auf diesem Rechner — sie verlassen niemals deine lokale Convex-Instanz.",
   "welcome_signed_in": "Angemeldet",
@@ -108,7 +108,7 @@
   "welcome_exchange": "Austauschen",
 
   "model_title": "Modell wählen",
-  "model_subtitle": "shim überschreibt mit dem hier gewählten Modell, was Cursor sendet. Du kannst es jederzeit in den Einstellungen ändern.",
+  "model_subtitle": "shim überschreibt mit dem gewählten Modell, was Cursor sendet. Du kannst es jederzeit in der Konsole ändern.",
   "model_picker_model": "Modell",
   "model_picker_effort": "Reasoning-Aufwand",
   "effort_tip_low": "wenig Nachdenken",
@@ -167,5 +167,37 @@
   "toast_authorize_opened": "Autorisierungs-Tab geöffnet",
   "toast_authorize_waiting": "warte auf den localhost:1455-Callback…",
   "toast_authorize_listener_unavailable": "Listener nicht verfügbar — füge die Weiterleitungs-URL nach der Zustimmung unten ein.",
-  "toast_signed_in": "angemeldet"
+  "toast_signed_in": "angemeldet",
+
+  "state_expiring": "läuft bald ab",
+
+  "console_title": "Konsole",
+  "console_endpoint_label": "Cursor-Modell",
+  "console_no_tunnel": "kein Tunnel festgelegt",
+
+  "routing_label": "Routing",
+  "routing_desc": "Cursors `shim`-Traffic wird an den aktiven Anbieter geleitet.",
+  "routing_live": "Live",
+  "routing_activate": "Aktiv setzen",
+  "routing_connect_first": "Verbinde zuerst {provider}",
+
+  "provider_connect": "{provider} verbinden",
+  "provider_disconnected_desc": "Nicht verbunden. Autorisiere, um Traffic hierher zu leiten.",
+
+  "connect_paste_placeholder": "Weiterleitungs-URL oder Code einfügen",
+  "connect_complete": "Abschließen",
+  "connect_hint": "Autorisiere im neuen Tab und füge das Ergebnis hier ein. ChatGPT schließt sich ggf. selbst ab.",
+
+  "usage_awaiting": "Warte auf Traffic — die Nutzung erscheint nach der ersten Anfrage.",
+
+  "activity_title": "Aktivität",
+  "activity_window": "Letzte 24 Std.",
+  "activity_requests": "Anfragen",
+  "activity_errors": "Fehler",
+  "activity_tokens_in": "Tokens rein",
+  "activity_tokens_out": "Tokens raus",
+
+  "toast_provider_switched": "Traffic geht jetzt an {provider}",
+
+  "model_provider_label": "Aktiver Anbieter"
 }

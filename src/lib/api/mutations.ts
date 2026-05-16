@@ -1,10 +1,10 @@
-// Mutation hooks for the dashboard's write endpoints. Each one invalidates or
-// directly updates the relevant query cache so every consumer stays in sync.
-// The mutationFns are TanStack Start server functions — typed end-to-end.
+// Mutation hooks for the dashboard's write endpoints. Each one invalidates the
+// relevant query cache so every consumer stays in sync. The mutationFns are
+// TanStack Start server functions — typed end-to-end.
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import type { SaveSettingsInput } from './schemas'
+import type { ProviderIdInput, SaveSettingsInput } from './schemas'
 import {
   exchangeCallback,
   initLogin,
@@ -12,29 +12,29 @@ import {
   refreshUsage,
   runTestConnection,
   saveSettings,
+  setActiveProvider,
 } from './server-fns'
 import { queryKeys } from './queries'
-import type { Settings } from './types'
 
-// Optimistic settings save: mirror the patch into the cache immediately, roll
-// back on error, and reconcile with the server via invalidation on settle.
 export function useSaveSettings() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (patch: SaveSettingsInput) => saveSettings({ data: patch }),
-    onMutate: async (patch) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.settings })
-      const previous = queryClient.getQueryData<Settings>(queryKeys.settings)
-      if (previous) {
-        queryClient.setQueryData<Settings>(queryKeys.settings, { ...previous, ...patch })
-      }
-      return { previous }
-    },
-    onError: (_error, _patch, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKeys.settings, context.previous)
-    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.settings })
+    },
+  })
+}
+
+// One-click active-provider switch. Invalidates both settings and auth status
+// (the top-level auth fields mirror the active provider).
+export function useSetActiveProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (provider: ProviderIdInput) => setActiveProvider({ data: provider }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.settings })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.authStatus })
     },
   })
 }
@@ -42,7 +42,7 @@ export function useSaveSettings() {
 export function useLogout() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => logout(),
+    mutationFn: (provider: ProviderIdInput) => logout({ data: { provider } }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.authStatus })
     },
@@ -62,13 +62,16 @@ export function useRefreshUsage() {
 }
 
 export function useInitLogin() {
-  return useMutation({ mutationFn: () => initLogin() })
+  return useMutation({
+    mutationFn: (provider: ProviderIdInput) => initLogin({ data: { provider } }),
+  })
 }
 
 export function useExchangeCallback() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (redirectUrl: string) => exchangeCallback({ data: { redirectUrl } }),
+    mutationFn: (input: { provider: ProviderIdInput; redirectUrl: string }) =>
+      exchangeCallback({ data: input }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.authStatus })
     },

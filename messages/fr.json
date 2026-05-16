@@ -12,13 +12,13 @@
   "nav_settings": "Paramètres",
   "nav_open_menu": "Ouvrir le menu",
 
-  "footer_tagline": "proxy byok codex",
+  "footer_tagline": "proxy byok",
   "footer_source": "source",
 
   "lang_switcher_label": "Langue",
 
   "auth_checking": "vérification…",
-  "auth_disconnected": "déconnecté — connectez-vous avec Codex",
+  "auth_disconnected": "déconnecté — connectez-vous à un fournisseur",
   "auth_expiring": "le jeton expire dans {expiry} — reconnectez-vous bientôt",
   "auth_connected": "connecté",
 
@@ -80,10 +80,10 @@
   "byok_step2_tail": " et collez les valeurs ci-dessous.",
   "byok_step3_lead": "Collez ",
   "byok_step3_em": "n'importe quelle chaîne non vide",
-  "byok_step3_tail": " comme clé API — shim utilise votre session ChatGPT, pas la clé.",
+  "byok_step3_tail": " comme clé API — shim utilise la session de votre fournisseur, pas la clé.",
   "byok_base_url": "URL de base",
   "byok_model_name": "Nom du modèle",
-  "byok_model_hint": "shim le remplace par le modèle Codex que vous avez choisi",
+  "byok_model_hint": "shim le remplace par le modèle de votre fournisseur actif",
   "byok_copy": "Copier",
   "byok_copied": "Copié",
   "byok_copy_aria": "Copier {label}",
@@ -91,14 +91,14 @@
 
   "onboarding_skip": "Ignorer la configuration",
   "onboarding_step_progress": "Étape {current} sur {total}",
-  "onboarding_step_welcome": "Connecter ChatGPT",
+  "onboarding_step_welcome": "Connecter un fournisseur",
   "onboarding_step_model": "Choisir un modèle",
   "onboarding_step_tunnel": "Exposer publiquement",
   "onboarding_step_cursor": "Configurer Cursor",
   "onboarding_step_test": "Tester la connexion",
 
   "welcome_title": "Bienvenue sur shim.",
-  "welcome_subtitle": "Un proxy local qui expose votre abonnement ChatGPT Plus / Pro à Cursor via le flux OAuth de Codex. Configurons tout ça.",
+  "welcome_subtitle": "Un proxy local qui relie vos abonnements ChatGPT et Claude à Cursor. Connectez au moins un fournisseur pour commencer.",
   "welcome_signin_title": "D'abord, connectez-vous avec ChatGPT",
   "welcome_signin_desc": "Nous ouvrirons un onglet vers ChatGPT pour la négociation OAuth de Codex. Vos jetons restent sur cette machine — ils ne quittent jamais votre instance Convex locale.",
   "welcome_signed_in": "Connecté",
@@ -108,7 +108,7 @@
   "welcome_exchange": "Échanger",
 
   "model_title": "Choisir un modèle",
-  "model_subtitle": "shim remplace ce que Cursor envoie par le modèle que vous choisissez ici. Vous pouvez le modifier à tout moment dans les Paramètres.",
+  "model_subtitle": "shim remplace ce que Cursor envoie par le modèle que vous choisissez. Vous pouvez le modifier à tout moment depuis la console.",
   "model_picker_model": "Modèle",
   "model_picker_effort": "Effort de raisonnement",
   "effort_tip_low": "réflexion légère",
@@ -167,5 +167,37 @@
   "toast_authorize_opened": "onglet d'autorisation ouvert",
   "toast_authorize_waiting": "en attente du rappel localhost:1455…",
   "toast_authorize_listener_unavailable": "écouteur indisponible — collez l'URL de redirection ci-dessous après consentement.",
-  "toast_signed_in": "connecté"
+  "toast_signed_in": "connecté",
+
+  "state_expiring": "expire bientôt",
+
+  "console_title": "Console",
+  "console_endpoint_label": "Modèle Cursor",
+  "console_no_tunnel": "aucun tunnel défini",
+
+  "routing_label": "Routage",
+  "routing_desc": "Le trafic `shim` de Cursor est routé vers le fournisseur actif.",
+  "routing_live": "En direct",
+  "routing_activate": "Définir comme actif",
+  "routing_connect_first": "Connectez d'abord {provider}",
+
+  "provider_connect": "Connecter {provider}",
+  "provider_disconnected_desc": "Non connecté. Autorisez pour router le trafic ici.",
+
+  "connect_paste_placeholder": "Collez l'URL de redirection ou le code",
+  "connect_complete": "Terminer",
+  "connect_hint": "Autorisez dans le nouvel onglet, puis collez le résultat ici. ChatGPT peut se terminer tout seul.",
+
+  "usage_awaiting": "En attente de trafic — l'utilisation apparaît après la première requête.",
+
+  "activity_title": "Activité",
+  "activity_window": "Dernières 24 h",
+  "activity_requests": "Requêtes",
+  "activity_errors": "Erreurs",
+  "activity_tokens_in": "Jetons entrants",
+  "activity_tokens_out": "Jetons sortants",
+
+  "toast_provider_switched": "Trafic routé vers {provider}",
+
+  "model_provider_label": "Fournisseur actif"
 }

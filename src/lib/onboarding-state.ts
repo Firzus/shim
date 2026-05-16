@@ -23,7 +23,10 @@ export function deriveProbe(
   analytics: Analytics,
 ): OnboardingProbe {
   return {
-    authenticated: auth.authenticated,
+    // Onboarding is satisfied once *any* provider is connected — the top-level
+    // `auth.authenticated` only mirrors the active provider, which may not be
+    // the one the user signed into.
+    authenticated: auth.providers.codex.authenticated || auth.providers.anthropic.authenticated,
     hasSettings: Boolean(settings.updatedAt),
     hasTunnelUrl: Boolean(settings.tunnelUrl),
     cursorRequests: analytics.cursorRequests,

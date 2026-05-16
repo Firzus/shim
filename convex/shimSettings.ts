@@ -2,11 +2,12 @@ import { v } from 'convex/values'
 import { SINGLETON_KEY, upsertShimSettings } from './helpers'
 import { mutation, query } from './_generated/server'
 
-// Dashboard-driven overrides for upstream calls (model, reasoning effort).
-// Cursor sends `model: "codex"` as a sentinel; the proxy reads this singleton
-// and stamps the user's chosen Codex model + reasoning effort onto the body
-// before forwarding. Unset fields fall back to defaults in
-// src/lib/server/settings.ts.
+// Dashboard-driven overrides for upstream calls. `activeProvider` decides
+// where the `shim` model name routes; model + effort are namespaced per
+// provider so switching the active provider doesn't reset the model choice.
+// Unset fields fall back to defaults in src/lib/server/settings.ts.
+
+const providerValidator = v.union(v.literal('codex'), v.literal('anthropic'))
 
 export const get = query({
   args: {},
@@ -17,8 +18,11 @@ export const get = query({
       .unique()
     if (!row) return null
     return {
-      model: row.model ?? null,
-      reasoningEffort: row.reasoningEffort ?? null,
+      activeProvider: row.activeProvider ?? null,
+      codexModel: row.codexModel ?? null,
+      codexEffort: row.codexEffort ?? null,
+      anthropicModel: row.anthropicModel ?? null,
+      anthropicEffort: row.anthropicEffort ?? null,
       tunnelUrl: row.tunnelUrl ?? null,
       updatedAt: row.updatedAt,
     }
@@ -27,8 +31,11 @@ export const get = query({
 
 export const save = mutation({
   args: {
-    model: v.optional(v.string()),
-    reasoningEffort: v.optional(v.string()),
+    activeProvider: v.optional(providerValidator),
+    codexModel: v.optional(v.string()),
+    codexEffort: v.optional(v.string()),
+    anthropicModel: v.optional(v.string()),
+    anthropicEffort: v.optional(v.string()),
     tunnelUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {

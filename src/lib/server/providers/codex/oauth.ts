@@ -1,6 +1,6 @@
 import { api } from '#/../convex/_generated/api'
-import { convex } from '../convex'
-import { logger, toErrorMessage } from '../logger'
+import { convex } from '../../convex'
+import { logger, toErrorMessage } from '../../logger'
 import {
   CODEX_AUTHORIZE_EXTRA_PARAMS,
   CODEX_AUTHORIZE_URL,
@@ -129,27 +129,36 @@ export async function exchangeCode(code: string, codeVerifier: string): Promise<
 // ---------------------------------------------------------------------------
 
 async function saveCredentials(auth: CodexAuth): Promise<void> {
+  // Codex-specific identifiers (account id, raw id_token) live in the generic
+  // `metadata` blob so the Convex column set stays provider-agnostic.
   await convex.mutation(api.oauthTokens.save, {
+    provider: 'codex',
     accessToken: auth.accessToken,
     refreshToken: auth.refreshToken,
-    idToken: auth.idToken,
-    chatgptAccountId: auth.chatgptAccountId,
     planType: auth.planType,
     expiresAt: auth.expiresAt,
     scopes: auth.scopes,
     obtainedAt: auth.obtainedAt,
+    metadata: { chatgptAccountId: auth.chatgptAccountId, idToken: auth.idToken },
   })
 }
 
 async function loadCredentials(): Promise<CodexAuth | null> {
   try {
-    const row = await convex.query(api.oauthTokens.get, {})
+    const row = await convex.query(api.oauthTokens.get, { provider: 'codex' })
     if (!row) return null
+    const metadata = row.metadata
+    const chatgptAccountId =
+      typeof metadata.chatgptAccountId === 'string' ? metadata.chatgptAccountId : ''
+    if (!chatgptAccountId) {
+      logger.error('[oauth] stored Codex credentials are missing chatgptAccountId')
+      return null
+    }
     return {
       accessToken: row.accessToken,
       refreshToken: row.refreshToken,
-      idToken: row.idToken ?? undefined,
-      chatgptAccountId: row.chatgptAccountId,
+      idToken: typeof metadata.idToken === 'string' ? metadata.idToken : undefined,
+      chatgptAccountId,
       planType: row.planType,
       expiresAt: row.expiresAt,
       scopes: row.scopes,
@@ -282,7 +291,7 @@ export async function getValidToken(): Promise<CachedToken | null> {
 export async function hasCredentials(): Promise<boolean> {
   try {
     const status = await convex.query(api.oauthTokens.getStatus, {})
-    return status.authenticated
+    return status.codex.authenticated
   } catch (error) {
     logger.warn(`[oauth] hasCredentials check failed: ${toErrorMessage(error)}`)
     return false

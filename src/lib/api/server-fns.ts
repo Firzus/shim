@@ -12,29 +12,53 @@
 import { createServerFn } from '@tanstack/react-start'
 
 import { api } from '#/../convex/_generated/api'
-import { postCodexResponses } from '#/lib/server/codex-client'
 import { convex } from '#/lib/server/convex'
 import { logger, toErrorMessage } from '#/lib/server/logger'
-import { clearCachedToken, getAuthorizationURL } from '#/lib/server/oauth/codex-oauth'
 import { exchangeAndPersist } from '#/lib/server/oauth/exchange'
 import { startCallbackListener } from '#/lib/server/oauth/listener'
 import { generatePKCE } from '#/lib/server/oauth/pkce'
 import { startPlanUsagePoller, tickPlanUsage } from '#/lib/server/plan-usage-poller'
+import { getProvider } from '#/lib/server/providers'
+import type { Provider, ProviderId } from '#/lib/server/providers'
 import {
-  ACCEPTED_REASONING_EFFORTS,
   getShimSettings,
   invalidateShimSettingsCache,
   normalizeTunnelUrl,
   resolveTunnelUrl,
-  SHIM_SETTINGS_DEFAULTS,
 } from '#/lib/server/settings'
-import { ACCEPTED_CODEX_MODELS } from '#/lib/server/translation/model-map'
 
-import { AnalyticsQuerySchema, ExchangeCallbackSchema, SaveSettingsSchema } from './schemas'
+import {
+  AnalyticsQuerySchema,
+  ExchangeCallbackSchema,
+  ProviderActionSchema,
+  ProviderIdSchema,
+  SaveSettingsSchema,
+} from './schemas'
 import type { UsageRaw } from './schemas'
 
-const ALLOWED_MODELS = new Set(ACCEPTED_CODEX_MODELS)
-const ALLOWED_EFFORTS = new Set<string>(ACCEPTED_REASONING_EFFORTS)
+// A stored shimSettings row — the per-provider namespaced model/effort fields.
+interface ShimSettingsRow {
+  activeProvider?: ProviderId | null
+  codexModel?: string | null
+  codexEffort?: string | null
+  anthropicModel?: string | null
+  anthropicEffort?: string | null
+}
+
+// Resolve a provider's model/effort/allow-lists from the stored settings row.
+function providerView(provider: Provider, row: ShimSettingsRow | null) {
+  const isCodex = provider.meta.id === 'codex'
+  const model = (isCodex ? row?.codexModel : row?.anthropicModel) || provider.meta.defaultModel
+  const effort = (isCodex ? row?.codexEffort : row?.anthropicEffort) || provider.meta.defaultEffort
+  return {
+    model,
+    effort,
+    allowed: {
+      models: Array.from(provider.meta.allowedModels),
+      efforts: Array.from(provider.meta.allowedEfforts),
+    },
+  }
+}
 
 // Derive the `stalenessMs` field server-side so the dashboard doesn't keep a
 // clock in sync. Shared by the GET and the manual-refresh POST.
@@ -47,16 +71,25 @@ function snapshotToUsage(snapshot: { capturedAt: number; raw?: unknown } | null)
   }
 }
 
+// Accepts either a full redirect URL (`...?code=X&state=Y`) or a bare
+// `code#state` string — Anthropic's hosted callback page shows the latter.
 function tryParseRedirectUrl(input: string): { code: string; state: string } | null {
+  const trimmed = input.trim()
   try {
-    const url = new URL(input)
+    const url = new URL(trimmed)
     const code = url.searchParams.get('code')
     const state = url.searchParams.get('state')
-    if (!code || !state) return null
-    return { code, state }
+    if (code && state) return { code, state }
   } catch {
-    return null
+    // not a URL — fall through to the bare `code#state` form
   }
+  const hashIdx = trimmed.indexOf('#')
+  if (hashIdx > 0) {
+    const code = trimmed.slice(0, hashIdx)
+    const state = trimmed.slice(hashIdx + 1)
+    if (code && state) return { code, state }
+  }
+  return null
 }
 
 // --- Auth -----------------------------------------------------------------
@@ -65,93 +98,129 @@ function tryParseRedirectUrl(input: string): { code: string; state: string } | n
 // poller's bootstrap, so usage stays fresh even before any proxy traffic.
 export const getAuthStatus = createServerFn({ method: 'GET' }).handler(async () => {
   startPlanUsagePoller()
-  return convex.query(api.oauthTokens.getStatus, {})
-})
-
-// Drives the full Codex OAuth/PKCE flow: persist the verifier, spin up the
-// localhost:1455 listener, and return the authorize URL. The listener's
-// completion runs fire-and-forget after the response — the dashboard polls
-// getAuthStatus to learn the outcome.
-export const initLogin = createServerFn({ method: 'POST' }).handler(async () => {
-  const { codeVerifier, codeChallenge } = await generatePKCE()
-  const state = crypto.randomUUID()
-
-  await convex.mutation(api.pkceState.insert, { state, codeVerifier })
-
-  const authURL = getAuthorizationURL(codeChallenge, state)
-
-  let listenerActive = false
-  try {
-    const callbackPromise = startCallbackListener()
-    listenerActive = true
-    void callbackPromise.then(
-      async ({ code, state: callbackState }) => {
-        try {
-          await exchangeAndPersist(code, callbackState)
-          logger.info('[auth] login flow completed via localhost:1455 listener')
-        } catch (error) {
-          logger.error(`[auth] post-callback exchange failed: ${toErrorMessage(error)}`)
-        }
-      },
-      (error: unknown) => {
-        logger.warn(`[auth] listener rejected: ${toErrorMessage(error)}`)
-      },
-    )
-  } catch (error) {
-    logger.warn(`[auth] could not start listener (${toErrorMessage(error)}) — paste fallback only`)
+  const [status, row] = await Promise.all([
+    convex.query(api.oauthTokens.getStatus, {}),
+    convex.query(api.shimSettings.get, {}),
+  ])
+  const activeProvider: ProviderId = row?.activeProvider ?? 'codex'
+  // Back-compat: top-level fields mirror the *active* provider so the existing
+  // status strip / dot / onboarding keep working; `providers` carries both.
+  return {
+    ...status[activeProvider],
+    activeProvider,
+    providers: status,
   }
-
-  return { authURL, state, listenerActive, fallbackAvailable: true }
 })
 
-// Fallback "paste-the-URL" exchange, used when port 1455 is unavailable. The
-// user copies the full redirect URL from their browser's address bar. Throws
-// on failure so the mutation surfaces a precise message.
+// Drives a provider's OAuth/PKCE flow: persist the verifier, spin up the
+// localhost listener (loopback providers only), and return the authorize URL.
+// The listener's completion runs fire-and-forget — the dashboard polls
+// getAuthStatus to learn the outcome. `provider` omitted ⇒ Codex.
+export const initLogin = createServerFn({ method: 'POST' })
+  .inputValidator(ProviderActionSchema)
+  .handler(async ({ data }) => {
+    const providerId: ProviderId = data.provider ?? 'codex'
+    const provider = getProvider(providerId)
+
+    const { codeVerifier, codeChallenge } = await generatePKCE()
+    const state = crypto.randomUUID()
+
+    await convex.mutation(api.pkceState.insert, { state, provider: providerId, codeVerifier })
+
+    const authURL = provider.oauth.getAuthorizationURL(codeChallenge, state)
+
+    let listenerActive = false
+    if (provider.oauth.redirectStrategy === 'loopback' && provider.oauth.loopbackPort) {
+      try {
+        const callbackPromise = startCallbackListener(
+          provider.oauth.loopbackPort,
+          provider.oauth.loopbackCallbackPath ?? '/auth/callback',
+        )
+        listenerActive = true
+        void callbackPromise.then(
+          async ({ code, state: callbackState }) => {
+            try {
+              await exchangeAndPersist(providerId, code, callbackState)
+              logger.info(`[auth] ${providerId} login completed via localhost listener`)
+            } catch (error) {
+              logger.error(`[auth] post-callback exchange failed: ${toErrorMessage(error)}`)
+            }
+          },
+          (error: unknown) => {
+            logger.warn(`[auth] listener rejected: ${toErrorMessage(error)}`)
+          },
+        )
+      } catch (error) {
+        logger.warn(
+          `[auth] could not start listener (${toErrorMessage(error)}) — paste fallback only`,
+        )
+      }
+    }
+
+    return { authURL, state, listenerActive, fallbackAvailable: true }
+  })
+
+// Callback exchange: the user pastes the redirect URL (or bare `code#state`).
+// Throws on failure so the mutation surfaces a precise message.
 export const exchangeCallback = createServerFn({ method: 'POST' })
   .inputValidator(ExchangeCallbackSchema)
   .handler(async ({ data }) => {
+    const providerId: ProviderId = data.provider ?? 'codex'
     const parsed = tryParseRedirectUrl(data.redirectUrl)
     if (!parsed) {
-      throw new Error('Missing code or state — paste the full redirect URL.')
+      throw new Error('Missing code or state — paste the full redirect URL or code.')
     }
-    await exchangeAndPersist(parsed.code, parsed.state)
+    await exchangeAndPersist(providerId, parsed.code, parsed.state)
     return { success: true as const, message: 'Authentication successful.' }
   })
 
-export const logout = createServerFn({ method: 'POST' }).handler(async () => {
-  await convex.mutation(api.oauthTokens.clear, {})
-  clearCachedToken()
-  return { success: true as const }
-})
+export const logout = createServerFn({ method: 'POST' })
+  .inputValidator(ProviderActionSchema)
+  .handler(async ({ data }) => {
+    const providerId: ProviderId = data.provider ?? 'codex'
+    await convex.mutation(api.oauthTokens.clear, { provider: providerId })
+    getProvider(providerId).clearCachedToken()
+    return { success: true as const }
+  })
 
 // --- Settings -------------------------------------------------------------
 
 export const getSettings = createServerFn({ method: 'GET' }).handler(async () => {
   const row = await convex.query(api.shimSettings.get, {})
   const { tunnelUrl, tunnelUrlSource } = resolveTunnelUrl(row?.tunnelUrl)
+  const activeProvider: ProviderId = row?.activeProvider ?? 'codex'
+
+  // `providers` carries both providers' model/effort/allow-lists so the
+  // dashboard can render a per-provider picker for each.
   return {
-    model: row?.model ?? SHIM_SETTINGS_DEFAULTS.model,
-    reasoningEffort: (row?.reasoningEffort ?? SHIM_SETTINGS_DEFAULTS.reasoningEffort) as string,
+    activeProvider,
     tunnelUrl,
     tunnelUrlSource,
     updatedAt: row?.updatedAt ?? null,
-    allowed: {
-      models: Array.from(ALLOWED_MODELS),
-      efforts: Array.from(ALLOWED_EFFORTS),
+    providers: {
+      codex: providerView(getProvider('codex'), row),
+      anthropic: providerView(getProvider('anthropic'), row),
     },
   }
 })
 
 // Zod guards the patch shape; the handler owns the allow-lists (it can return
-// precise messages) and the tunnel-URL normalization.
+// precise messages) and the tunnel-URL normalization. `provider` omitted ⇒ the
+// active provider.
 export const saveSettings = createServerFn({ method: 'POST' })
   .inputValidator(SaveSettingsSchema)
   .handler(async ({ data }) => {
-    if (data.model !== undefined && !ALLOWED_MODELS.has(data.model)) {
-      throw new Error(`unsupported model: ${data.model}`)
+    // `provider` omitted ⇒ write to whichever provider is currently active;
+    // only then do we need to read the row to resolve it.
+    const target: ProviderId =
+      data.provider ?? (await convex.query(api.shimSettings.get, {}))?.activeProvider ?? 'codex'
+    const meta = getProvider(target).meta
+
+    if (data.model !== undefined && !meta.allowedModels.includes(data.model)) {
+      throw new Error(`unsupported model for ${target}: ${data.model}`)
     }
-    if (data.reasoningEffort !== undefined && !ALLOWED_EFFORTS.has(data.reasoningEffort)) {
-      throw new Error(`unsupported effort: ${data.reasoningEffort}`)
+    if (data.reasoningEffort !== undefined && !meta.allowedEfforts.includes(data.reasoningEffort)) {
+      throw new Error(`unsupported effort for ${target}: ${data.reasoningEffort}`)
     }
 
     let normalizedTunnel: string | undefined
@@ -162,12 +231,23 @@ export const saveSettings = createServerFn({ method: 'POST' })
     }
 
     await convex.mutation(api.shimSettings.save, {
-      model: data.model,
-      reasoningEffort: data.reasoningEffort,
+      ...(target === 'codex'
+        ? { codexModel: data.model, codexEffort: data.reasoningEffort }
+        : { anthropicModel: data.model, anthropicEffort: data.reasoningEffort }),
       tunnelUrl: normalizedTunnel,
     })
     invalidateShimSettingsCache()
     return { ok: true as const }
+  })
+
+// One-click active-provider switch — both providers stay authenticated, so no
+// re-login is needed; the next `shim` request routes to the chosen provider.
+export const setActiveProvider = createServerFn({ method: 'POST' })
+  .inputValidator(ProviderIdSchema)
+  .handler(async ({ data }) => {
+    await convex.mutation(api.shimSettings.save, { activeProvider: data })
+    invalidateShimSettingsCache()
+    return { ok: true as const, activeProvider: data }
   })
 
 // --- Analytics + plan usage ----------------------------------------------
@@ -180,45 +260,57 @@ export const getAnalytics = createServerFn({ method: 'GET' })
     return convex.query(api.requests.getAnalytics, { since, now })
   })
 
-export const getUsage = createServerFn({ method: 'GET' }).handler(async () => {
-  const snapshot = await convex.query(api.planUsage.get, {})
-  return snapshotToUsage(snapshot)
-})
+// Both providers' usage in one shot — the Console renders Codex and Anthropic
+// side by side, so it never wants just the active one.
+async function bothUsageSnapshots() {
+  const [codex, anthropic] = await Promise.all([
+    convex.query(api.planUsage.get, { provider: 'codex' }),
+    convex.query(api.planUsage.get, { provider: 'anthropic' }),
+  ])
+  return { codex: snapshotToUsage(codex), anthropic: snapshotToUsage(anthropic) }
+}
 
-// Manual refresh: the POST returns the fresh snapshot so the dashboard writes
-// it straight into the query cache. A failed upstream poll still resolves with
-// the last-known (stale) snapshot rather than throwing.
+export const getUsage = createServerFn({ method: 'GET' }).handler(() => bothUsageSnapshots())
+
+// Manual refresh: the POST returns the fresh snapshots so the dashboard writes
+// them straight into the query cache. `tickPlanUsage` only polls Codex —
+// Anthropic usage is header-driven and refreshes on real proxy traffic.
 export const refreshUsage = createServerFn({ method: 'POST' }).handler(async () => {
   await tickPlanUsage()
-  const snapshot = await convex.query(api.planUsage.get, {})
-  return snapshotToUsage(snapshot)
+  return bothUsageSnapshots()
 })
 
 // --- Connection test ------------------------------------------------------
 
-// Synthetic upstream ping for the onboarding wizard. Confirms tokens present,
-// upstream reachable, settings applied. Never throws — the outcome (including
-// failures) is the return value so the wizard can show details.
+// Synthetic upstream ping for the onboarding wizard. Routes through the active
+// provider so it confirms whichever upstream the dashboard is set to. Never
+// throws — the outcome (including failures) is the return value.
 export const runTestConnection = createServerFn({ method: 'POST' }).handler(async () => {
   const startedAt = performance.now()
   const settings = await getShimSettings()
+  const provider = getProvider(settings.activeProvider)
   const testConnectionId = 'shim-test-connection'
 
-  const body: Record<string, unknown> = {
-    model: settings.model,
-    instructions: 'You are a connection test. Reply with exactly one word.',
-    input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'ping' }] }],
+  // A minimal OpenAI-chat request the provider's translator converts to its
+  // own upstream shape.
+  const rawBody: Record<string, unknown> = {
+    model: 'shim',
+    messages: [
+      { role: 'system', content: 'You are a connection test. Reply with exactly one word.' },
+      { role: 'user', content: 'ping' },
+    ],
     stream: true,
-    store: false,
-    prompt_cache_key: testConnectionId,
-    reasoning: { effort: settings.reasoningEffort },
   }
 
   try {
-    const upstream = await postCodexResponses({
-      body,
-      sessionId: testConnectionId,
-      conversationId: testConnectionId,
+    const built = provider.translation.buildUpstreamBody(rawBody, {
+      model: settings.model,
+      effort: settings.reasoningEffort,
+    })
+    const upstream = await provider.upstream.postChatRequest({
+      body: built.body,
+      sessionId: built.promptCacheKey || testConnectionId,
+      conversationId: built.promptCacheKey || testConnectionId,
     })
     if (!upstream.ok) {
       const text = await upstream

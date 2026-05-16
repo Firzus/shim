@@ -1,4 +1,4 @@
-import { deriveCacheKey } from './cache-key'
+import { deriveCacheKey } from '../../../translation/cache-key'
 import { mapToCodexModel, type ModelMappingResult } from './model-map'
 
 // Cursor BYOK sends a Responses-API-shaped body at /v1/chat/completions when

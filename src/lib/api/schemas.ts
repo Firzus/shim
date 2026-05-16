@@ -5,10 +5,20 @@
 
 import { z } from 'zod'
 
-// Patch sent to `saveSettings`. Field-level validity (allowed model / effort,
-// tunnel-URL shape) is enforced server-side in the handler, which owns the
-// allow-lists and can return precise messages.
+// Which upstream provider an auth/login action targets.
+export const ProviderIdSchema = z.enum(['codex', 'anthropic'])
+export type ProviderIdInput = z.infer<typeof ProviderIdSchema>
+
+// `initLogin` / `logout` target a provider; omitted ⇒ Codex (back-compat).
+export const ProviderActionSchema = z.object({
+  provider: ProviderIdSchema.optional(),
+})
+
+// Patch sent to `saveSettings`. `provider` selects which provider's model /
+// effort to write (omitted ⇒ active provider). Field-level validity is
+// enforced server-side in the handler, which owns the per-provider allow-lists.
 export const SaveSettingsSchema = z.object({
+  provider: ProviderIdSchema.optional(),
   model: z.string().optional(),
   reasoningEffort: z.string().optional(),
   tunnelUrl: z.string().optional(),
@@ -24,9 +34,11 @@ export const AnalyticsQuerySchema = z.object({
     .max(24 * 90),
 })
 
-// OAuth fallback: the user pastes the full redirect URL from their browser.
+// OAuth callback exchange: the user pastes either the full redirect URL or a
+// bare `code#state` string (Anthropic's hosted page shows the latter).
 export const ExchangeCallbackSchema = z.object({
-  redirectUrl: z.string().min(1, 'paste the full redirect URL'),
+  provider: ProviderIdSchema.optional(),
+  redirectUrl: z.string().min(1, 'paste the redirect URL or code'),
 })
 export type ExchangeCallbackInput = z.infer<typeof ExchangeCallbackSchema>
 

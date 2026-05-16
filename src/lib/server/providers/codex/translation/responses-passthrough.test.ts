@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildCodexFromResponsesBody, chatMessagesToInputItems } from './responses-passthrough'
-import cursorResponsesBody from '../../../../test/fixtures/cursor-responses-body.json'
-import cursorChatBody from '../../../../test/fixtures/cursor-chat-body.json'
+import cursorResponsesBody from '../../../../../../test/fixtures/cursor-responses-body.json'
+import cursorChatBody from '../../../../../../test/fixtures/cursor-chat-body.json'
 
 // The passthrough translator is the load-bearing piece for multi-turn
 // reasoning. The single most important property: `reasoning` items with
