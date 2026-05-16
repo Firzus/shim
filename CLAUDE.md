@@ -97,7 +97,7 @@ The dashboard talks to the server through **TanStack Start server functions** (`
 - **TypeScript strict**: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `noUncheckedSideEffectImports` all on. No `any`.
 - **ESM + `verbatimModuleSyntax`**: use `import type { ... }` for type-only imports.
 - **Server vs client split**: anything under `src/lib/server/**` and `src/routes/api/**` is server-only. Route components in `src/routes/*.tsx` may be isomorphic. `src/lib/api/server-fns.ts` is isomorphic-by-design — the plugin extracts `.handler()` bodies — so server-only modules there must be used **only inside handlers**. OAuth tokens, Convex admin operations, and upstream HTTP **never** touch client bundles.
-- **Convex types**: import generated types from `#/../convex/_generated/api` and treat `convex/_generated/**` as read-only — regenerate via `pnpm convex:deploy`.
+- **Convex types**: import generated types from `@/../convex/_generated/api` and treat `convex/_generated/**` as read-only — regenerate via `pnpm convex:deploy`.
 - **Validation at boundaries**: use `zod` for payloads that cross trust boundaries. Dashboard server-function inputs are validated via `.inputValidator(schema)` with the schemas in `src/lib/api/schemas.ts`.
 - **Errors**: in server functions, `throw` on failure (the client mutation/query surfaces it). For the proxy HTTP path, return an explicit `Response`/JSON with the right status (`openaiErrorBody(...)`).
 
